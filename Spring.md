@@ -1,4 +1,5 @@
 **Spring이란?**
+
 자바 기반의 엔터프라이즈 애플리케이션을 구축하는데 사용되는 프레임워크
 
 주요 장점
@@ -26,6 +27,7 @@
 
 ---
 **@RequiredArgsConstructor**
+
 Lombok에서 제공하는 어노테이션으로 필수 필드에 대해 생성자를 자동으로 생성해주는 기능으로 final 또는 @NonNull 어노테이션이 붙은 필드를 매개변수로 받는 생성자를 자동으로 생성해준다.
 - 컴파일 시점에 생성자를 자동으로 생성 -> 최적화 달성
 - 리플렉션을 사용하지 않고 일반적인 메서드 호출 방식으로 동작
@@ -35,6 +37,7 @@ Lombok에서 제공하는 어노테이션으로 필수 필드에 대해 생성�
 
 --- 
 **왜 Bean을 사용하는가?**
+
 - Spring IoC 컨테이너는 객체의 생성, 초기화, 설정, 소멸 등 효율적으로 관리
 - 이를 통해 중복된 코드를 줄이고, 싱글톤 빈으로 설정된 객체는 하나의 인스턴스만 생성되기 때문에 메모리 사용량을 줄일 수 있다.
 - 의존성 주입을 통해 테스트 가능성을 높이고 객체 간의 결합도를 낮출 수 있다.
@@ -42,6 +45,7 @@ Lombok에서 제공하는 어노테이션으로 필수 필드에 대해 생성�
 
 ---
 **Spring AOP**
+
 핵심 비즈니스 로직에 횡단 관심사를 분리하여 모듈화하는 프로그래밍 기법
 
 - 런타임 시 프록시 객체를 사용하여 횡단 관심사를 처리하는 방식
@@ -85,6 +89,7 @@ Lombok에서 제공하는 어노테이션으로 필수 필드에 대해 생성�
 
 ---
 **@RequestBody, @RequestParam, @ModelAttribute**
+
 **@RequestBody** 는 클라이언트가 전송하는 JSON 형태의 HTTP Body 내용을 MessageConverter를 통해 Java Object로 변환시켜주는 역할을 합니다.
 
 **@RequestParam** 은 필수 여부가 true이기 때문에, 기본적으로 반드시 해당 파라미터가 전송되어야 합니다. 전송되지 않으면 400 Error를 유발할 수 있으며, 반드시 필요한 변수가 아니라면 required의 값을 false로 설정해줘야 합니다.
@@ -96,10 +101,12 @@ Lombok에서 제공하는 어노테이션으로 필수 필드에 대해 생성�
 
 ---
 **Servlet**
+
 HTTP 요청 정보를 쉽게 사용하고, 응답 정보를 쉽게 반환할 수 있으며 개발자들이 집중해야하는 처리 로직에 집중이 가능하다.
 
 ---
 **Spring의 주요 모듈**
+
 - Spring Core : Spring Framework 중심에 있는 모듈, IoC와 DI 제공을 통해 객체 간의 느슨한 결합 지원
 	- 코어를 확장한 모듈로 Spring Context가 있음
 	- BeanFactory : 생성할 빈에 대한 정보 및 객체를 보유한 컨테이너
@@ -115,6 +122,7 @@ HTTP 요청 정보를 쉽게 사용하고, 응답 정보를 쉽게 반환할 수
 
 ---
 **@Autowired와 @Qualifier 차이**
+
 - Autowired : 스프링에서 DI를 자동으로 처리해주는 어노테이션
 - Qualifier : @Autowired와 함께 사용되어 자동 주입 시 모호성을 해결하는데 사용하는 어노테이션
 
@@ -122,6 +130,7 @@ HTTP 요청 정보를 쉽게 사용하고, 응답 정보를 쉽게 반환할 수
 
 ---
 **@Component, @Repository, @Service, @Controller 차이**
+
 - @Component : 특정 목적이 없는 일반적인 빈을 등록할 때 사용하기 위한 어노테이션으로 빈 등록에 기본이 되는 어노테이션
 - @Repository : 데이터 접근 계층(DAO)에서 사용하는 어노테이션이고, 데이터 액세스 관련 예외를 스프링의 데이터 액세스 예외로 변환
 - @Service : 비즈니스 로직을 수행하는 서비스 계층에서 사용하는 어노테이션이고, 트랜잭션 처리를 관리
@@ -129,6 +138,7 @@ HTTP 요청 정보를 쉽게 사용하고, 응답 정보를 쉽게 반환할 수
 
 ---
 **Bean Scope 종류**
+
 - Singleton : Spring 컨테이너에 하나의 인스턴스만 생성되는 스코프로 메모리 사용 효율이 높고, 빈의 인스턴스 관리가 용이
 - Prototype : 매번 새로운 인스턴스를 생성하고 의존성 주입 이후로는 스프링 컨테이너가 관리하지 않아 수명 주기를 직접 관리해야 할 수도 있음
 - Request : HTTP 요청당 하나의 빈 인스턴스를 생성하고, 요청이 완료되면 소멸
@@ -136,6 +146,7 @@ HTTP 요청 정보를 쉽게 사용하고, 응답 정보를 쉽게 반환할 수
 
 ---
 **SpringBoot와 Spring Framework의 차이**
+
 SpringBoot는 SpringFramework를 기반으로 더 간편한 설정과 빠른 개발을 지원하는 확장된 프로젝트이며, 차이점은 다음과 같다.
 
 - XML 파일이나 Java 기반 설정을 수동으로 하지 않고, Autoconfiguration 기능을 제공하여 처리하며, @SpringBootApplication 어노테이션 하나로 프로젝트에 대한 간편 설정이 가능
@@ -156,6 +167,7 @@ SpringBoot는 SpringFramework를 기반으로 더 간편한 설정과 빠른 개
 
 ---
 **@SpringBootApplication 어노테이션의 역할**
+
 @SpringBootConfiguration, @EnableAutoConfiguration, @ComponentSacn 3개의 핵심 어노테이션을 조합한 형태로 애플리케이션 시작 시 간편 설정을 지원하는 역할을 합니다.
 
 먼저 @ComponentScan을 통해 설정된 패키지 범위 내에서 빈을 스캔하고, IoC 컨테이너에 빈들을 구성하고, @EnableAutoConfiguration을 통해 클래스 패스에 있는 의존성을 기반으로 자동 설정을 수행하는데 이 때 starter-web 의존성이 존재하면 내장 WAS가 자동 설정되어 웹 애플리케이션 환경이 구성됩니다.
@@ -166,6 +178,7 @@ SpringBoot는 SpringFramework를 기반으로 더 간편한 설정과 빠른 개
 
 ---
 **SpringBoot의 내장형 서버**
+
 애플리케이션이 별도의 WAS 설치 및 설정 없이 독립적으로 실행될 수 있도록 지원하는 기능이다.
 
 종류는 Tomcat, Jetty, Undertow 3가지가 있으며 기본 설정은 Tomcat으로 되어있다.
