@@ -3,6 +3,7 @@
 <img width="600" alt="스크린샷 2024-11-16 오후 8 18 57" src="https://github.com/user-attachments/assets/334f5995-9903-4757-a719-9f4a012f0353">
 
 Heap, Stack, Pc register, Method area 구분
+
 Heap
 - 객체, 배열과 같은 동적으로 생성되는 인스턴스가 위치하는 메모리 영역
 - 공유 영역으로 모든 스레드가 접근 가능
@@ -10,14 +11,17 @@ Heap
 - young generation : eden(최초 할당), survivor(Minor GC 수행)
 - old generation : 가득차면 Minor GC 수행
 - metaspace
+
 Stack
 - 각 스레드마다 존재
 - 지역, 매개 변수 및 리턴 주소 등이 저장되는 영역
 - 스레드별로 독립되어 동기화 문제가 발생하지 않음
 - 메모리 접근이 빠르다
+
 Program Count Register 
 - 현재 실행중인 스레드가 다음에 실행할 명령의 주소를 카리키게함
 - 스레드별로 독립적
+
 Method area
 - 클래스에 대한 메타데이터 저장 영역
 - 상수, static 변수, 메서드 코드 등
