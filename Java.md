@@ -378,7 +378,6 @@ final / finally / finalize
 	- Optional 지원
 	- 병렬 처리 지원
 - java 11
-	- Spring에 새로운 메소드 추가
 	- Files 클래스에 새로운 메소드 추가
 	- 컬렉션 인터페이스에 새로운 메소드 추가
 	- Predicate 인터페이스에 새로운 메소드 추가
