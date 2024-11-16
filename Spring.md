@@ -253,7 +253,9 @@ Controller
 
 ---
 **Spring MVC 아키텍처**
-![[SpringMVC 아키텍처.png||600]]
+
+<img width="600" alt="SpringMVC 아키텍처" src="https://github.com/user-attachments/assets/2906e2ca-634b-4bec-9685-2778eab76fe8">
+
 
 - DispatcherServlet : 클라이언트의 모든 요청을 받아들이는 프론트 컨트롤러 요청을 적절한 핸들러에게 전달
 - HandlerMapping : 들어온 요청을 처리할 수 있는 핸들러를 결정
