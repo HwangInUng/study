@@ -287,3 +287,35 @@ WHERE은 기본적으로 데이터를 그룹화하기 전에 행 단위로 조�
 - Index Only Scan : 인덱스에 필요한 데이터가 있는 경우 사용되는 방식이다.
 - Bitmap Scan : Sequential Scan + Index Scan 조합 방식으로, Index Scan에서 발생할 수 있는 과도한 랜덤 I/O를 방지하면서 어느정도 성능을 보장한다.
 ```
+
+---
+**트랜잭션 격리수준**
+
+Read Uncommitted
+```basic
+트랜잭션의 커밋이 반영되지 않은 내용도 읽을 수 있는 격리수준
+
+발생가능한 문제 - Dirty Read, Non Repeatable Read, Phantom Read
+```
+
+Read Committed : Postgresql Default
+```basic
+트랜잭션 커밋이 반영된 내용만 읽을 수 있는 격리수준
+
+발생가능한 문제 - Non Repeatable Read, Phantom Read
+```
+
+Repeatable Read : MySQL Default
+```basic
+트랜잭션이 수행되는 범위 데이터에 대한 수정/삭제가 불가능하게하여 조회 시
+항상 동일한 데이터 응답을 보장하는 격리수준
+
+발생가능한 문제 - Phantom Read
+```
+
+Serializeble
+```basic
+트랜잭션이 수행중인 범위에 대하여 아무런 작업도 수행하지 못하는 격리수준
+
+발생가능한 문제 - 없음
+```
