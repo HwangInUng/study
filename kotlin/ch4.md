@@ -449,3 +449,18 @@ class TestUser (val name: String) {
         }
 }
 ```
+
+#### 접근자의 가시성 변경
+>접근자의 가시성은 기본적으로 프로퍼티의 가시성과 같지만 원하는 경우 별도로 지정이 가능하다.
+
+```kotlin
+class LengthCounter {
+    var counter: Int = 0
+        private set // 길이 변경 방지를 위한 private 설정
+    
+    fun addWord(word: String) {
+        counter += word.length
+    }
+}
+```
+위 코드처럼 문자열의 길이를 반환하는 클래스가 있을 때 임의로 길이를 변경하지 못하도록 세터에 별도로 접근자의 가시성을 부여할 수 있다.
