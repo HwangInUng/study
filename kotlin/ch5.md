@@ -89,4 +89,80 @@ Java는 람다 표현식을 컴파일 단계에서 익명 클래스로 직접 �
 |메모리 사용량|감소|증가|
 |클래스 로딩 오버헤드|감소|증가|
 
-### 
+### 5.1 람다식과 멤버 참조
+#### 5.1.1 람다 소개 : 위 자바의 람다 설명으로 대체한다.
+
+#### 5.1.2 람다와 컬렉션
+>람다가 없는 경우 컬렉션을 편리하게 처리할 수 있는 좋은 라이브러리를 제공하기 힘들다.
+
+다음 코드를 보면서 이해해보자.
+예시에 사용된 클래스는 다음과 같다.
+```kotlin
+data class Person(val name: String, val age: Int)
+```
+
+**컬렌셕 직접 탐색**
+```kotlin
+fun findOldest(people: List<Person>) {
+    var maxAge = 0
+    // null 허용
+    var theOldest: Person? = null
+    // 반복문을 직접 수행하며 대소 비교
+    for (person in people) {
+        if (person.age > maxAge) {
+            // 조건에 해당하는 결과를 변수에 저장
+            maxAge = person.age
+            theOldest = person
+        }
+    }
+    // 결과 출력
+    println(theOldest)
+}
+```
+직접 탐색의 경우 중복적이고 단순 반복되는 코드들이 작성되기 마련이고, 개발자에 의한 실수가 발생할 수 있다.
+
+**람다 사용**
+```kotlin
+// 일반 표현 방식 : {}를 사용
+println(people.maxBy { it.age })
+
+// 멤버 참조 방식 : ()를 사용
+println(people.maxBy(Person::age))
+```
+여기서 사용된 `it` 키워드는 컬렉션의 원소를 인자로 받을 때 그 인자를 가리킨다.
+추가적으로 멤버 참조 방식을 사용하면 코드가 간결해지면서 타입까지 명시해주어 가독성이 향상된다.
+
+자바에는 `maxBy()` 함수처럼 라이브러리 함수가 부족한 상황이다.
+
+#### 5.1.3 람다 식의 문법
+>람다는 값처럼 여기저기 전달할 수 있는 동작의 모음이다.
+
+- 람다를 따로 선언하여 변수에 저장이 가능하다.
+- 하지만 일반적으로 함수에 인자로 넘기면서 바로 람다를 정의한다.
+
+**문법**
+```kotlin
+// 정의
+{x: Int, y: Int -> x + y}
+
+// 호출 및 사용
+val sum = {x: Int, y: Int -> x + y}
+println(sum(1, 2)}
+```
+코틀린 람다 문법의 특징은 항상 `{}`로 둘러쌓여 있다. 그렇다면 자바의 문법은 어떤지 살펴보자.
+
+```java
+// 타입 생략
+BinaryOperation<Integer> sum = (x, y) -> x + y;
+// 타입 명시
+BinaryOperation<Integer> sum = (Integer x, Integer y) -> x + y;
+// 실행부가 여러 줄인 경우
+BinaryOperation<Integer> sum = (Integer x, Integer y) -> {
+  ... 실행부 코드
+  return x + y;
+};
+```
+위와 같이 파라미터는 `()`로 감싸주고, 실행부는 여러 줄인 경우에만 `{}`로 감싸준다.
+
+가장 큰 특징은 코틀린의 경우 파라미터와 실행부가 모두 `{}`안에 작성되며, 자바는 파라미터와 실행부가 나뉘어 작성된다는 특징이 있다.
+
