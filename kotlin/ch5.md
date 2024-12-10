@@ -123,22 +123,28 @@ fun findOldest(people: List<Person>) {
 
 **람다 사용**
 ```kotlin
-// 일반 표현 방식 : {}를 사용
+// 타입 명시
+println(people.maxBy{p:Person -> p.age})
+
+// it 키워드 사용
+// 람다의 파라미터가 하나이고, 컴파일러가 타입 추론이 가능할 때 사용 가능
 println(people.maxBy { it.age })
 
 // 멤버 참조 방식 : ()를 사용
 println(people.maxBy(Person::age))
 ```
-여기서 사용된 `it` 키워드는 컬렉션의 원소를 인자로 받을 때 그 인자를 가리킨다.
-추가적으로 멤버 참조 방식을 사용하면 코드가 간결해지면서 타입까지 명시해주어 가독성이 향상된다.
 
 자바에는 `maxBy()` 함수처럼 라이브러리 함수가 부족한 상황이다.
 
 #### 5.1.3 람다 식의 문법
 >람다는 값처럼 여기저기 전달할 수 있는 동작의 모음이다.
 
-- 람다를 따로 선언하여 변수에 저장이 가능하다.
-- 하지만 일반적으로 함수에 인자로 넘기면서 바로 람다를 정의한다.
+람다에는 몇가지 규칙이 있는데 다음과 같다.
+- 복수 개의 인자 중 마지막 인자가 람다인 경우 () 밖으로 빼내서 작성 가능 -> Trailing Lambda 문법
+- 인자가 람다만 존재할 경우 ()를 생략하여 작성 가능
+- 파라미터 타입은 컴파일러에 의한 추론으로 생략 가능
+- 멤버 참조를 사용 가능
+- it 키워드 사용 가능
 
 **문법**
 ```kotlin
@@ -148,6 +154,19 @@ println(people.maxBy(Person::age))
 // 호출 및 사용
 val sum = {x: Int, y: Int -> x + y}
 println(sum(1, 2)}
+
+// Trailing Lambda 문법
+people.testFun(x, y, { it.age })
+people.testFun(x, y) { it.age }
+
+// 인자가 람다뿐이면 () 생략
+people.testFun { it.age }
+
+// 실행부가 여려 줄인 경우
+val sum = {x: Int, y: Int ->
+  ... 실행부 코드
+  x + y  // 반환 위치
+}
 ```
 코틀린 람다 문법의 특징은 항상 `{}`로 둘러쌓여 있다. 그렇다면 자바의 문법은 어떤지 살펴보자.
 
@@ -164,5 +183,19 @@ BinaryOperation<Integer> sum = (Integer x, Integer y) -> {
 ```
 위와 같이 파라미터는 `()`로 감싸주고, 실행부는 여러 줄인 경우에만 `{}`로 감싸준다.
 
-가장 큰 특징은 코틀린의 경우 파라미터와 실행부가 모두 `{}`안에 작성되며, 자바는 파라미터와 실행부가 나뉘어 작성된다는 특징이 있다.
+**주의 사항**
+>it을 사용하는 관습은 코드를 간단히 만들지만 람다가 중첩되는 경우 it의 대상을 식별하기가 어렵다.
 
+```kotlin
+val people = listOf(Person("Alice", 30), Person("Bob", 25))
+
+// 두 람다 모두 it을 사용
+val result = people.filter { it.age > 20 }     // 여기의 it은 Person 객체를 가리킴
+    .map { it.name.length }     // 여기의 it은 filter 결과의 각 Person 객체를 가리키지만,
+
+// 개선된 방식
+val result = people.filter { person -> person.age > 20 }
+                   .map { filteredPerson -> filteredPerson.name.length }
+```
+
+#### 5.1.4 현재 영역에 있는 변수에 접근
