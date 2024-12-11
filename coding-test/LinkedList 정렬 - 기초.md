@@ -56,6 +56,8 @@ LinkedList에 대한 이론적인 부분을 찾아보고 문제를 다시 풀어
 위와 같은 고려사항을 해결하기 위해 다음과 같은 절차로 코드를 작성하기로 했다.
 
 ### 코드 작성
+
+#### 의사 코드
 ```java
 class Solution {
   public ListNode mergeTwoLists (ListNode list1, ListNode list2) {
@@ -74,8 +76,117 @@ class Solution {
       if (노드 1이 더 큰 경우) {}
       else {} // 노드 2가 더 큰 경우
 
-      // 6.
+      // 6. 다음 노드 최신화
     }
+
+    // 7. 남은 노드를 추가
+    if(노드1,2 == null) {}
   }
 }
 ```
+#### 실제 코드
+```java
+class Solution {
+  public ListNode mergeTwoLists (ListNode list1, ListNode list2) {
+    // 노드 중 어느 한쪽이 null인 경우 남은 노드 반환
+    if(list1 == null) return list2;
+    if(list2 == null) return list1;
+
+    // 결과 노드 및 반복 시 다음 노드를 가리키는 노드 생성
+    // 여기서 target은 head의 next
+    ListNode head = new ListNode();
+    ListNode target = head;
+
+    while (list1 != null && list2 != null) {
+      if(list1.val > list2.val) {
+        target.next = list2;
+        list2 = list2.next;
+      } else {
+        target.next = list1;
+        list1 = list1.next;
+      }
+
+      // 현재 target을 다음 노드로 갱신
+      target = target.next;
+    }
+
+    if(list1 != null) {
+      target.next = list2;
+    } else {
+      target.next = list1;
+    }
+
+    // head는 기본 생성자로 생성한 노드
+    // next가 실제 merge된 노드의 head
+    return head.next;
+  }
+}
+```
+
+위의 절차대로 수행되었을 때 흐름을 보자. 파라미터는 다음과 같다.
+```java
+list1 = [1, 2, 4], list2 = [1, 3, 4]
+```
+**초기 상태**
+
+![image | 400](https://github.com/user-attachments/assets/dc6aa7f4-425b-4d70-b11f-a2c437c910b2)
+
+**첫 번째 비교**
+
+![image|400](https://github.com/user-attachments/assets/bda2a901-1f5f-4ce2-99c4-05a69f20f9bb)
+
+- `list1.val > list2.val`이 false이므로 target에 list1를 연결
+- list1 다음 노드로 갱신
+- target 다음 노드로 갱신
+
+**두 번째 비교**
+
+![image|400](https://github.com/user-attachments/assets/e0aebc4e-dca9-41fb-ae2c-3982f30e96fa)
+
+- `list1.val > list2.val`이 true이므로 target에 list2를 연결
+- list2 다음 노드로 갱신
+- target 다음 노드로 갱신
+
+**세 번째 비교**
+
+![image|400](https://github.com/user-attachments/assets/c072dad6-9d22-48df-af65-e011f4e49ad1)
+
+- `list1.val > list2.val`이 false이므로 target에 list1를 연결
+- list1 다음 노드로 갱신
+- target 다음 노드로 갱신
+
+**네 번째 비교**
+
+![image|400](https://github.com/user-attachments/assets/2e9dfa38-df5a-4a32-b1d9-36ca37db2fba)
+
+- `list1.val > list2.val`이 true이므로 target에 list2를 연결
+- list2 다음 노드로 갱신
+- target 다음 노드로 갱신
+
+**다섯 번째 비교**
+
+![image|400](https://github.com/user-attachments/assets/49ddf8d9-7107-4f75-8b32-8f5662efb6ec)
+
+- `list1.val > list2.val`이 false이므로 target에 list1를 연결
+- list1 다음 노드로 갱신
+- target 다음 노드로 갱신
+
+여기까지 `while`을 통한 반복을 수행한 상태이고, 반복이 종료 후 남은 노드를 확인 후 마지막에 연결한다.
+
+**남은 노드 확인**
+
+![image|500](https://github.com/user-attachments/assets/d1ed95de-7a16-4f3b-953e-d02a383af005)
+
+list2가 null이 아니기 때문에 해당 노드를 마지막에 연결하여 결과를 반환하면 된다.
+
+---
+
+### 정리
+이 문제는 LeetCode의 Easy로 분류되는 문제이다. 시간이 오래걸린 이유는 다음과 같다.
+
+- 문제를 정확히 분석하지 못함
+- 링크드 리스트에 대한 정확한 이해가 부족
+- 조건 비교를 통해 어떤 노드를 연결해야할지 명확한 기준을 생각하는데 시간을 낭비
+- 머리로만 문제를 풀려고 했던 부분, 그림으로 표현했으면 훨씬 편하게 풀었을지도 모름
+
+문제를 맞히는 것도 중요하지만 해결하는 과정에서 내가 아직 뭘 모르는지 파악하는게 더 중요하다고 생각했다.
