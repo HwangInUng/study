@@ -334,3 +334,111 @@ val createPerson = ::Person
 val p = createPerson("Alice", 29) // 인스턴스 저장
 println(p::age) // 바운드 멤버 참조
 ```
+
+### 5.2 컬렉션 함수형 API
+#### 5.2.1 필수적인 함수 : filter와 map
+filter와 map은 컬렉션을 활용할 때 기반이 되는 함수로 다음과 같은 특징이 있다.
+
+- filter
+  - 컬렉션을 이터레이션할 때 주어진 술어를 만족하는 요소만 반환
+  - 기존 컬렉션과 반환되는 컬렉션의 요소 수가 다를 수 있음
+  - 원소 자체를 변환할 수 없음
+- map
+  - 컬렉션의 모든 요소를 순회하며 작업을 수행
+  - 기존 컬렉션과 반환되는 컬렉션의 요소 수가 동일
+  - 원소에 대한 변경이 가능
+ 
+추가적으로 자바에는 컬렉션 자체에 filter와 map이 존재하지 않기 때문에 `list.stream().map()` 처럼 `stream()`을 사용하여야한다.
+
+**코드**
+```kotlin
+val list = listOf(1, 2, 3, 4)
+
+// filter
+val filterdList = list.filter {it % 2 == 0}
+println(filterdList.size)
+>> 2
+
+// map
+val zeroList = list.map {it * 0}
+println(zeroList.size)
+>> 4
+```
+자바 코드는 다음과 같다.
+
+```java
+// filter
+List<Integer> list = Arrays.asList(1, 2, 3, 4);
+
+List<Integer> filteredList = list.stream()
+                                 .filter(it -> it % 2 == 0)
+                                 .collect(Collectors.toList());
+System.out.println(filteredList.size());
+>>2
+
+// map
+List<Integer> zeroList = list.stream()
+                             .map(it -> it * 0)
+                             .collect(Collectors.toList());
+System.out.println(zeroList.size());
+>>4
+```
+
+멤버 참조를 이용하면 아래와 같이 작성도 가능하다.
+```kotlin
+data class Person (val name: String, val age: Int)
+
+val people = listOf(Person("hwang", 33), Person("park", 32))
+println(people.map{Person::name})
+>> ["hwang", "park"]
+```
+
+**주의 사항**
+컬렉션 API를 사용하다보면 체이닝 순서 및 술어 조건으로 중첩되게 사용하는 경우가 발생한다.
+조건에 대한 구분을 명확히하여, 사전에 계산이 가능한 부분은 계산 후 컬렉션 API를 활용하도록 연습하자.
+
+```kotlin
+// maxBy()가 people의 요소 수만큼 중첩으로 반복되어 실행
+people.filter { it.age == people.maxBy(Person::age)!!.age}
+
+// 개선
+// 참고로 !!. 은 null이 아니라고 단언하는 연산자
+val maxAge = people.maxBy{Person::age}!!.age
+people.filter {it.age == maxAge}
+```
+위 코드처럼 최대 값을 구하고, 그 값을 기준으로 filter를 수행하면된다.
+
+마지막으로 filter와 map을 Map에 적용해보자.
+```kotlin
+val numbers = mapOf(0 to "zero", 1 to "one")
+
+// mapValues를 통해 Map의 value수만큼 이터레이션을 진행하며 값 변경
+println(numbers.mapValues {it.value.toUpperCase()}
+>> {0=ZERO, 1=ONE}
+```
+
+코틀린에서 두 줄짜리 코드가 자바로 구현하면 어떻게 되는지 알아보자.
+```java
+Map<Integer, String> numbers = new HashMap<>();
+numbers.put(0, "zero");
+numbers.put(1, "one");
+
+// Stream API를 사용해 값(value)을 변경한 새로운 Map 생성
+Map<Integer, String> upperCaseMap = numbers.entrySet().stream()
+        .collect(Collectors.toMap( // Collectors 유틸 클래스를 통해 맵으로 변환
+                Map.Entry::getKey,  // key를 호출
+                e -> e.getValue().toUpperCase() // 코틀린에서 실제 사용된 부분
+        ));
+
+System.out.println(upperCaseMap); 
+>>{0=ZERO, 1=ONE}
+```
+
+코틀린은 이 외에도 Map을 다루는 함수가 다음과 같이 존재한다.
+
+- filterKeys
+- mapKeys
+- filterValues
+- mapValues
+
+#### 5.2.2 all, any, count, find : 컬렉션에 술어 적용
