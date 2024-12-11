@@ -292,3 +292,45 @@ fun main() {
 주의 해야할 부분은 람다를 이벤트 핸들러 또는 비동기적으로 실행되는 코드로 사용할 경우 함수 호출이 종료된 후 로컬 변수가 변경될 수 있다는 점이다.
 
 #### 5.1.5 멤버 참조
+>프로퍼니타 메서드를 단 하나만 호출하는 함수 값을 만들어주며 이중콜론(::)을 사용한다.
+
+기본적인 사용법은 다음과 같다.
+```kotlin
+// 람다식
+val getAge = {person: Person -> person.age}
+// 멤버 참조
+val getAge = Person::age
+```
+
+최상위에 선언된 함수나 프로퍼티 참조도 가능하다.
+```kotiln
+fun salute() = println("Salute")
+
+run(::salute)
+```
+
+인자가 여럿인 다른 함수한테 작업을 위임하는 경우 람다를 정의하지 않고, 직접 위임 함수에 대한 참조를 제공하면 편리하다.
+```kotiln
+val action = {person: Person, message: String ->
+  sendEmail(person, message) // 람다가 작업을 위임한 함수
+}
+
+val nextAction = ::sendEmail // 람다 대신 멤버 참조로 사용 가능
+```
+
+**생성자 참조**
+```kotlin
+// 인스턴스를 생성하는 동작을 값으로 저장
+val createPerson = ::Person
+val p = createPerson("Alice", 29)
+```
+확장 함수도 멤버 함수와 똑같은 방식으로 참조가 가능하다는 점을 기억하자.
+
+**바운드 멤버 참조**
+코틀린 1.1부터 지원하는 참조 방식으로 멤버 참조를 생성할 때 클래스 인스턴스를 함께 저장하여 나중에 호출하여 사용 가능하다.
+
+```kotlin
+val createPerson = ::Person
+val p = createPerson("Alice", 29) // 인스턴스 저장
+println(p::age) // 바운드 멤버 참조
+```
