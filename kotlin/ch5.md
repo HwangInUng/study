@@ -199,3 +199,96 @@ val result = people.filter { person -> person.age > 20 }
 ```
 
 #### 5.1.4 현재 영역에 있는 변수에 접근
+>람다를 함수 안에서 정의하면 함수의 파라미터뿐 아니라 람다 정의 앞에 선언된 로컬 변수까지 람다에서 모두 사용 가능하다.
+
+이 부분에서의 자바와 코틀린의 차이는 다음과 같다.
+- 자바 : `final`로 명시적으로 선언되거나 `effectivly final`로 사실상 바뀌지 않는 상태여야한다.
+  - 자바에서 외부 변수에 대한 변경을 시도하면 다음과 같은 컴파일 에러가 발생한다.
+  - `"Local variables referenced from a lambda expression must be final or effectively final"`
+- 코틀린 : `final` 여부와 관계없이 참조가 가능하며, `var` 변수의 경우 람다 안에서 값을 변경하는게 가능하다.
+
+**변수 접근**
+```kotlin
+fun printMessagesWithPrefix (messages:Collection<String>, prefix: String) {
+    // 인자가 람다뿐이기 때문에 () 생략
+    messages.forEach {
+        // 람다를 정의한 함수의 파라미터 사용
+        println("$prefix $it")
+    }
+}
+```
+java에서 작성하면 다음과 같다.
+```java
+public void printMessagesWithPrefix (List<String> messages, String prefix) {
+  messages.forEach(message -> System.out.println(prefix));
+}
+```
+
+코틀린 코드에서 볼 수 있듯이 자바와 가장 큰 차이점은 바깥의 변수를 변경할 수 있고, `final` 변수가 아닌 변수에도 접근 할 수 있다는 것이다.
+다음은 바깥 함수의 로컬 변수 변경하는 예제이다.
+```kotlin
+fun printProblemCounts (response: Collection<String>) {
+    // final이 아닌 함수의 로컬 변수
+    var clientErrors = 0
+    var serverErrors = 0
+
+    response.forEach {
+        // 조건에 맞는 변수 값 변경
+        if (it.startsWith("4")) {
+            clientErrors++;
+        } else if (it.startsWith("5")) {
+            serverErrors;
+        }
+    }
+
+    println("$clientErrors client errors, $serverErrors server errors")
+}
+```
+
+**포획한 변수(capture)**
+>람다 안에서 사용하는 외부 변수를 '람다가 포획한 변수'라고 칭한다. 이렇게 람다가 포획한 변수는 함수 내부에서 참조할 수 있다.
+
+이렇게 람다가 포획한 변수를 함수 내부에서 참조할 수 있는 메커니즘을 클로저(closure)라고 한다.
+클로저는 다음과 같은 특징을 가진다.
+
+- 함수가 선언될 당시의 스코프 유지
+- 외부 함수의 지역 변수나 상태를 함수 실행 시점에 참조 가능
+- 스코프에 대한 참조를 유지하여 외부 함수의 생명 주기가 끝나도 해당 변수를 사용 가능
+
+코틀린 코드를 통해 클로저에 대해 알아보자.
+```kotlin
+// () -> Int 타입 람다 반환
+fun outer(): () -> Int {
+    // 지역 변수
+    var count = 0
+    return {
+        count++
+        count
+    }
+}
+
+fun main() {
+    // 람다
+    val counter = outer()
+    println(counter()) // 1
+    println(counter()) // 2
+}
+```
+위 코드에서의 클로저 동작은 다음과 같다.
+
+- outer()는 `() -> Int` 타입의 람다를 반환
+- `() -> Int`는 outer() 함수 내부에 선언된 `count` 변수를 캡처
+- outer() 함수 호출 이후에도 `count` 값에 접근하고 증가가 가능
+- `counter`를 통해 람다를 호출할 때마다 `count`가 증가
+
+즉, `() -> Int` 타입의 람다는 `count`를 캡처하여 계속해서 참조하는 것이다.
+캡처된 정보는 어디에 어떻게 보관하는지 알아보자.
+
+- 코틀린 컴파일러가 람다를 구현하기 위해 익명 클래스 혹은 특별한 객체를 생성
+- 해당 객체에 필드로 캡처된 변수에 대한 참조를 저장
+- 람다 객체는 이 필드를 통해 외부 변수의 상태를 유지 및 접근
+- 스택에 쌓였던 count는 람다가 캡처 시 람다 객체의 필드로 옮겨져 힙 영역에 위치
+
+주의 해야할 부분은 람다를 이벤트 핸들러 또는 비동기적으로 실행되는 코드로 사용할 경우 함수 호출이 종료된 후 로컬 변수가 변경될 수 있다는 점이다.
+
+#### 5.1.5 멤버 참조
