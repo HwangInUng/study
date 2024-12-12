@@ -89,6 +89,8 @@ Java는 람다 표현식을 컴파일 단계에서 익명 클래스로 직접 �
 |메모리 사용량|감소|증가|
 |클래스 로딩 오버헤드|감소|증가|
 
+---
+
 ### 5.1 람다식과 멤버 참조
 #### 5.1.1 람다 소개 : 위 자바의 람다 설명으로 대체한다.
 
@@ -335,6 +337,8 @@ val p = createPerson("Alice", 29) // 인스턴스 저장
 println(p::age) // 바운드 멤버 참조
 ```
 
+---
+
 ### 5.2 컬렉션 함수형 API
 #### 5.2.1 필수적인 함수 : filter와 map
 filter와 map은 컬렉션을 활용할 때 기반이 되는 함수로 다음과 같은 특징이 있다.
@@ -442,3 +446,261 @@ System.out.println(upperCaseMap);
 - mapValues
 
 #### 5.2.2 all, any, count, find : 컬렉션에 술어 적용
+각 함수는 다음과 같은 역할을 수행한다.
+
+- all : 모든 원소가 술어를 만족하는지 여부
+- any : 하나의 원소라도 술어를 만족하는지 여부
+- count : 술어를 만족하는 원소들의 수
+- find : 술어를 만족하는 가장 첫 번째 원소 반환
+
+사용법은 다음과 같다.
+```kotlin
+fun allAndOthers() {
+    val people = listOf(Person("Alice", 27), Person("Jay", 32), Person("H", 33))
+
+    // 모든 원소가 25살 이상인지
+    println(people.all { it.age > 25 })
+    // 원소중 20대가 있는지
+    println(people.any { it.age < 30 })
+    // 30대인 사람은 몇명인지
+    println(people.count { it.age > 29 })
+    // 30대 중 가장 첫 번째 원소
+    println(people.find { it.age > 29 }!!.name)
+}
+
+allAndOthers()
+>> true
+>> true
+>> 2
+>> Jay
+```
+
+all, any, count, find가 자바에서는 어떻게 표현되는지 알아보자.
+```java
+public static void main(String[] args) {
+    List<Person> people = Arrays.asList(
+        new Person("Alice", 27),
+        new Person("Jay", 32),
+        new Person("H", 33)
+    );
+
+    // 모든 원소가 25살 이상인지
+    boolean allOver25 = people.stream().allMatch(p -> p.getAge() > 25);
+    System.out.println(allOver25);
+
+    // 원소 중 20대가 있는지(any)
+    boolean any20s = people.stream().anyMatch(p -> p.getAge() < 30);
+    System.out.println(any20s);
+
+    // 30대인 사람은 몇명인지(count)
+    long countOver29 = people.stream().filter(p -> p.getAge() > 29).count();
+    System.out.println(countOver29);
+
+    // 30대 중 가장 첫 번째 원소(findFirst)
+    Person firstOver29 = people.stream().filter(p -> p.getAge() > 29).findFirst().orElse(null);
+    if (firstOver29 != null) {
+        System.out.println(firstOver29.getName());
+    } else {
+        System.out.println("No one found");
+    }
+}
+```
+코드에서 볼 수 있듯이 모든 함수는 `stream()`을 이용하여 처리하고, count와 find의 경우는 filter()를 통해 사전 분리를 수행한 후 함수를 한번 더 호출한다.
+
+#### 5.2.3 groupBy + 5.2.4 flatMap과 flatten
+각 함수의 역할은 다음과 같다.
+
+- groupBy : 컬렉션의 원소 그룹에 따라 여러 컬렉션으로 분할
+- flatMap : 중첩된 컬렉션에서 한 리스트로 모으는 역할로 변환이 필요한 경우 사용
+- flatten : flatMap과 유사하게 동작하며 변환이 필요하지 않은 경우 사용
+
+코드를 살펴보자.
+```kotlin
+fun groupByAndOthers () {
+    val people = listOf(Person("Alice", 27), Person("Jay", 32), Person("H", 33))
+    val strings = listOf("test", "cola")
+
+    println(people.groupBy { it.age })
+    println(strings.flatMap { it.toList() })
+}
+
+>> {27=[Person(name=Alice, age=27)], 32=[Person(name=Jay, age=32)], 33=[Person(name=H, age=33)]}
+>> [t, e, s, t, c, o, l, a]
+```
+
+자바로 변환된 코드를 확인해보자.
+```java
+public static void main(String[] args) {
+    List<Person> people = Arrays.asList(
+        new Person("Alice", 27),
+        new Person("Jay", 32),
+        new Person("H", 33)
+    );
+    List<String> strings = Arrays.asList("test", "cola");
+
+    // groupBy { it.age }
+    Map<Integer, List<Person>> groupedByAge = people.stream()
+        .collect(Collectors.groupingBy(Person::getAge));
+    System.out.println(groupedByAge);
+
+    // flatMap { it.toList() } - 문자열을 문자 리스트로 평탄화
+    // toList()와 유사한 동작: 문자열을 char 스트림으로 변환 후 Collect
+    List<Character> flattenedChars = strings.stream()
+        .flatMap(s -> s.chars().mapToObj(c -> (char) c))
+        .collect(Collectors.toList());
+    System.out.println(flattenedChars);
+}
+```
+
+위에서부터 코드를 보면 항상 반복되는 코드가 있는데 바로 최종 연산을 수행하는 `Colletors.xxx()`이다.
+스트림을 사용하면 최종 연산이 수행될 때 모든 계산이 이루어지기 때문에 최종 연산을 사용하지 않으면 에러가 발생한다.
+이 부분에서 코틀린과 자바의 코드 가독성과 길이, 중복 등의 차이가 발생하는 것 같다.
+
+컬렉션을 다룰 때에는 위 함수뿐만 아니라 그 때 필요한 부분을 찾아보고 적용할 필요가 있다.
+구현을 하는 시간보다 함수를 찾아서 적용하는 시간이 더 적게 들기 때문이다.
+
+---
+
+### 5.3 지연 계산(Lazy) 컬렉션 연산
+>시퀀스를 사용하여 중간 임시 컬렉션을 사용하지 않고 컬렉션 연산을 연쇄하는 방법에 대해 알아보자.
+
+컬렉션을 사용하여 연쇄적으로 함수를 호출하면 함수마다 새로운 컬렉션이 임시 결과를 저장한다.
+수행하는 횟수가 많아진다면 임시 결과를 저장할 새로운 컬렉션이 계속 필요할 것이다.
+
+이 부분을 해결하기 위해 사용할 수 있는 것이 `Sequence`이다. 자바에서는 `Stream`과 동일하다.
+다만, 자바의 `Stream`은 병렬처리가 가능하다는 장점이 있다.
+
+먼저 아래 코드로 문법을 보자.
+
+```kotlin
+people.asSequence() // 원본 컬렉션 시퀀스로 변환
+  .map(Person::name)
+  .filter{it.startWith("A")}
+  .toLsit() // 최종 연산
+```
+
+위 코드를 자바로 바꾸면 아래와 같다.
+```java
+people.stream()
+  .map(Person::name)
+  .filter(person -> person.name.startWith("A"))
+  .collect(Collectors.toList());
+```
+
+코틀린에서는 큰 컬렉션에 대한 연산은 `Sequence`를 사용하는 것을 규칙으로 삼으라고 권하고 있다.
+중간 연산을 최소화하고 원소가 실제로 필요할 때 비로소 계산되기 때문이다.
+
+#### 5.3.1 시퀀스 연산 실행 : 중간 연산과 최종 연산
+시퀀스에는 중간 연산과 최종 연산이 있다.
+
+중간 연산은 다른 시퀀스를 반환하며 최초 시퀀스의 원소를 변환하는 방법을 알고 있다.
+최종 연산은 결과를 반환하며 결과는 중간 연산을 통해 얻은 정보를 통해 반환한다.
+
+중요한 점은 중간 연산은 항상 **지연 계산**된다. 즉 최종 연산이 호출되어 원소가 쓰임이 생겼을 때 계산이 발생한다.
+최종 연산을 수행하면 연기됐던 모든 계산이 수행된다.
+
+또한, 컬렉션과 시퀀스의 연산은 다음 그림과 같은 차이가 있다.
+- 컬렉션 : map() 완료 -> filter () 수행
+- 시퀀스 : map()과 filter()를 원소 마다 적용하여 수행
+
+<img width="400" alt="스크린샷 2024-12-12 오후 6 25 37" src="https://github.com/user-attachments/assets/fdb9f7da-5e63-40fd-b7aa-a06759003e65" />
+
+이렇게 수행하면 조건에 해당하는 원소가 식별되었을 때 연산을 종료하여 추가적인 연산을 수행하지 않아도 된다.
+
+#### 5.3.2 시퀀스 만들기
+asSquence()를 사용하지 않고 시퀀스를 만드는 방법은 다음과 같다.
+
+```kotlin
+val naturalNumbers = generateSequence(0) { it + 1 }
+val numbersTo100 = naturalNumbers.takeWhile { it <= 100 }
+
+// 여기서 최종 연산은 sum()
+println(numbersTo100.sum())
+>> 5050
+```
+
+---
+
+### 5.4 자바 함수형 인터페이스 활용 : 상단 자바 설명으로 대체
+
+---
+
+### 5.5 수신 객체 지정 람다: with와 apply
+수신 객체를 명시하지 않고 람다의 본문 안에서 다른 객체의 메서드를 호출할 수 있게 하는 기능이다.
+
+#### 5.5.1 with 함수
+어떤 객체의 이름을 반복하지 않고 다양한 연산을 수행하는 기능을 제공하는 라이브러리 함수이다.
+
+```kotlin
+// with 미사용
+fun alphabet(): String {
+  val result = StringBuilder()
+
+  for (letter in 'A'..'Z') {
+    result.append(letter)
+  }
+
+  result.append("\nNow I know the alphabet!)
+  return result.toString()
+}
+
+// with 사용
+fun alphabet(): String {
+    val stringBuilder = StringBuilder()
+
+    return with(stringBuilder) { // 객체 지정
+        // this가 모두 생략되어도 동작함
+        for (letter in 'A'..'Z') {
+            append(letter)
+        }
+        append("test")
+        toString() // 반환
+    }
+}
+```
+with은 다음과 같은 규칙이 있다.
+
+- 첫 번째 인자로 받은 객체를 두 번째 인자로 받은 람다의 수신 객체로 만듦
+- 람다 본문에서 this를 이용해 수신 객체에 접근 가능
+- 프로퍼티나 메서드 이름만으로도 접근 가능
+
+|일반 함수|일반 람다|
+|---|---|
+|확장함수|수신 객체 지정 람다|
+
+만약, with의 수신 객체로 지정한 객체와 with을 사용하는 클래스 안에 이름이 동일한 메서드가 있는 경우 다음과 같이 레이블을 붙이고 호출한다.
+```kotlin
+this@OuterClass.toString()
+```
+
+#### 5.5.2 apply 함수
+with과 거의 유사하지만 수신 객체를 반환한다는 차이가 있으며 확장 함수로 정의되어 있다.
+
+```kotlin
+fun alphabet () = StringBuilder().apply {
+  for(letter in 'A'..'Z') {
+    append(letter)
+  }
+
+  append("\n Good")
+}.toString() // 결과 반환
+```
+
+apply는 인스턴스를 생성하면서 즉시 프로퍼티 중 일부를 초기화 할 때 유용하게 사용이 가능하다.
+```kotlin
+fun createView(context: Context) =
+  TextView(context).apply { // 함수의 파라미터를 생성자 인자로 전달
+    text = "sample text"
+    textSize = 20.0
+    setPadding(10, 0, 0, 0)
+  }
+```
+
+참고로 자바는 람다에서 this를 사용하는 경우 람다를 호출한 외부 클래스의 인스턴스를 가리킨다.
+즉, 람다를 포함하는 객체에 대한 인스턴스를 가리키지 않는다는 것이 with과 apply와의 차이다.
+
+---
+
+### 정리
+람다에 대한 기본적인 개념부터 코틀린과 람다의 차이 관점에서 코틀린에서의 람다 프로그래밍을 알아보았다.
+아직 미숙한 개념들이 많지만 확실한 건 자바에서 사용할 때 발생하던 보일러 플레이트 코드들은 굉장히 많이 줄어든 것 같다는 느낌을 받았다.
