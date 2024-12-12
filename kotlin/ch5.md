@@ -582,7 +582,7 @@ people.asSequence() // 원본 컬렉션 시퀀스로 변환
 위 코드를 자바로 바꾸면 아래와 같다.
 ```java
 people.stream()
-  .map(Person::name)
+  .map(Person::getName)
   .filter(person -> person.name.startWith("A"))
   .collect(Collectors.toList());
 ```
