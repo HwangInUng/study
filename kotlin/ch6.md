@@ -366,26 +366,33 @@ info?.let(::println)
 이런 문제를 해결해 주는 것이 lateinit 변경자이다.
 
 ```kotlin
-class MyService {
-    fun performAction(): String = "foo"
-}
-
 class MyTest {
     // lateinit을 사용할 때 var로 프로퍼티 선언
-    private lateinit var myService: MyService? = null
-    @Before
+    private lateinit var myService: MyService
     fun setUp() {
         myService = MyService()
     }
 
-    @Test
-    fun testAction() {
-        Assert.assertEquals(
-            "foo",
-            myService.performAction()
-        )
+    fun testAction():String {
+        return myService.performAction()
     }
 }
+
+// 예외 케이스
+// lateinit property myService has not been initialized 예외 발생
+fun main(args: Array<String>) {
+    val test = MyTest()
+
+    println(test.testAction())
+}
+
+// 정상 실행
+fun main(args: Array<String>) {
+    val test = MyTest()
+    test.setUp()
+    println(test.testAction())
+}
+
 ```
 
 - lateinit 프로퍼티는 DI 프레임워크와 사용하는 경우가 많다.
