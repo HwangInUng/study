@@ -142,10 +142,223 @@ fun main(args: Array<String>) {
 ```
 
 #### 6.1.4 엘비스 연산자: ?:
+null 대신 사용할 디폴트 값을 지정할 때 편리하게 사용할 수 있는 연산자이다.
+
+- ?: 모양이 시계방향으로 90도 눕혔을 때 엘비스를 닮았다고해서 이름이 붙여졌다.
+- 널 복합 연산자라고도 부른다.
+
+```kotiln
+fun foo (s: String?) {
+  val t: String = s ?: ""
+}
+```
+
+- 이항 연산자로 좌항을 계산한 값이 널인지 검사
+- 널이 아니면 좌항 값을 결과, 널이면 우항 값을 결과로 반환
+- 객체가 널인 경우 널을 반환하는 안전한 호출 연산자와 함께 사용
+- 객체가 널인 경우에 대비한 값을 지정
+
+```kotlin
+fun strLenSafe(s: String?) = s?.length ?: 0
+
+fun main(args: Array<String>) {
+    println(strLenSafe("abc"))
+    println(strLenSafe(null))
+}
+
+// countryName 코드 간소화
+fun Customer.contryName (): String = this.company?.address?.country ?: "Unkown"
+```
+
+- return, throw 등의 연산도 식으로 작동한다.
+- 엘비스 연산자 우항에 return, throw를 넣을 수도 있다.
+- 이런 패턴은 전제 조건을 검사하는 경우 특히 유용하다.
+
+```kotlin
+fun printShoppingLabel (customer: Customer) {
+    val address = customer.company?.address
+        ?: throw IllegalArgumentException("No Address")
+
+    // 수신 객체 지정 람다 사용
+    // 위에서 검사가 수행되었기 때문에 null이 아니라고 확신
+    with (address) {
+        println(streetAddress)
+        println("$zipCode $city, $country")
+    }
+}
+
+fun main(args: Array<String>) {
+    val address = Address("Elsestr. 47", 90676, "Munich", "Germany")
+    val jetbrains = Company("JetBrains", address)
+    val customer = Customer("Dmitry", jetbrains)
+
+    printShoppingLabel(customer)
+    // exception 반환
+    printShoppingLabel(Customer("ET", null))
+}
+```
 
 #### 6.1.5 안전한 캐스트: as?
+어떤 값을 지정한 타입으로 캐스트하는 연산자이다.
+
+- 값을 대상 타입으로 변환할 수 없으면 null을 반환한다.
+- 일반적인 패턴은 캐스트를 수행한 뒤 엘비스 연산자를 사용하는 것이다.
+
+```kotlin
+class Ch6Person(val firstName: String, val lastName: String) {
+    override fun equals(other: Any?): Boolean {
+        // 안전한 캐스트와 엘비스 연산자를 활용
+        val otherPerson = other as? Ch6Person ?: return false
+
+        return otherPerson.firstName == firstName && otherPerson.lastName == lastName
+    }
+
+    override fun hashCode(): Int = firstName.hashCode() * 37 + lastName.hashCode()
+}
+
+fun main(args: Array<String>) {
+    val p1 = Ch6Person("Dmitry", "Jemerov")
+    val p2 = Ch6Person("Dmitry", "Jemerov")
+
+    // ==는 equals 호출
+    println(p1 == p2)
+    println(p1.equals(p2))
+}
+```
+
 #### 6.1.6 널 아님 단언: !!
+null이 될 수 있는 타입의 값을 다룰 때 사용할 수 있는 도구 중 가장 단순하면서도 무딘 도구이다.
+
+- 어떤 값이든 널이 될 수 없는 타입으로 강제
+- 실제 널에 !!를 적용하면 NPE 발생
+
+```kotlin
+fun ignoreNulls (s: String?) {
+    // 널일 수 있는 값에 !! 적용
+    val sNotNull: String = s!! // 예외는 여기를 가리킨다
+    println(sNotNull.length)
+}
+
+fun main(args: Array<String>) {
+    // null 전달
+    ignoreNulls(null)
+}
+
+>>Exception in thread "main" java.lang.NullPointerException
+```
+
+- 예외가 발생한 지점은 null 값을 사용하는 코드가 아니라 단언문이 위치한 곳을 가리키는 점을 유의해야한다.
+- !!이 쓰인 곳의 값이 null이 아님을 잘못알고 있다는 차원에서 예외를 해당 위치에서 가리키는 것 같다.
+- !!를 사용해서 발생하는 예외의 스택 트레이스는 어떤 식에서 예외가 발생했는지에 대한 정보가 들어있지 않다는 점을 유의해야한다.
+
+```kotlin
+person.company!!.address!!.country // 이렇게 작성하면 어떤 부분에서 예외가 발생했는지 알기 어렵다
+```
+
+!!는 호출된 함수가 언제나 다른 함수에서 널이 아닌 값을 전달받는다는 사실이 분명하다면 굳이 널 검사를 할 필요 없이 널 아님 단언문을 사용하면된다.
+
 #### 6.1.7 let 함수
+null이 될 수 있는 식을 더 쉽게 다룰 수 있는 함수이다.
+
+- 안전한 호출 연산자와 함께 사용하면 결과를 변수에 넣는 작업을 간단한 식으로 구현이 가능하다.
+- 널이 될 수 있는 값을 널이 아닌 값만 인자로 받는 함수에 넘기는 경우 자주 사용한다.
+
+```kotlin
+// 예외 케이스
+fun sendEmailTo(email: String) = email
+
+fun main(args: Array<String>) {
+    val email: String? = ""
+    sendEmailTo(email)
+}
+
+>>Type mismatch.
+  Required:
+  String
+  Found:
+  String?
+
+// 정상 처리
+fun sendEmailTo(email: String) = email
+
+fun main(args: Array<String>) {
+    val email: String? = ""
+    // null 체크
+    if (email != null) sendEmailTo(email)
+}
+```
+
+- let 함수는 자신의 수신 객체를 인자로 전달받은 람다에게 넘긴다.
+- 안전한 호출 구문을 사용해 널이 될 수 있는 값에 대해 let을 호출하고,
+- 널이 될 수 없는 타입을 인자로 받는 람다를 let에 전달한다.
+- 널이 될 수 있는 타입의 값을 널이 될 수 없는 타입의 값으로 바꿔서 람다에 전달하게 된다.
+
+```kotlin
+fun sendEmailTo(email: String) = email
+
+fun main(args: Array<String>) {
+    val email: String? = null
+    // 기본사용 문법
+    email?.let { email -> sendEmailTo(email) }
+    // it 사용
+    email?.let { sendEmailTo(it) }
+}
+
+// 조금 더 긴 패턴
+fun sendEmailTo(email: String) {
+    println("Sending email to $email")
+}
+
+fun main(args: Array<String>) {
+    var email: String? = "yole@example.com"
+    email?.let { sendEmailTo(it) }
+
+    email = null
+    email?.let { sendEmailTo(it) }
+}
+```
+
+- 아주 긴 식이 있고 그 값이 널이 아닐 때 수행해야 하는 로직이 있을 때 쓰면 더 편하다.
+- 긴 식의 결과를 저장하는 변수를 따로 만들 필요가 없다.
+
+```kotlin
+// 긴 식의 결과를 담을 변수 선언
+val person: Person? = getTheBestPersonInTheWorld()
+// 변수 null 여부 확인
+if (person != null) sendEmailTo(person.email)
+
+// let 사용 간소화
+getTheBestPersonInTheWorld().let { sendEmailTo{it.email} }
+```
+
+복수 개의 값이 널인지 검사해야하는 경우 다음과 같이 처리 가능하지만 중첩되기 때문에 가독성이 떨어진다.
+이런 경우는 if를 사용해 모든 값을 한꺼번에 검사하는 편이 나을 수도 있다.
+
+```kotlin
+// 중첩 let
+val name: String? = "Alice"
+val age: Int? = 30
+val city: String? = null
+
+name?.let { nonNullName ->
+    age?.let { nonNullAge ->
+        city?.let { nonNullCity ->
+            // name, age, city 모두 널이 아닐 때만 이 블록이 실행됨
+            println("Name: $nonNullName, Age: $nonNullAge, City: $nonNullCity")
+        }
+    }
+}
+
+// if 사용
+val info = if (name != null && age != null && city != null) {
+    "Name: $name, Age: $age, City: $city"
+} else {
+    null
+}
+
+info?.let(::println)
+```
+
 #### 6.1.8 나중에 초기화할 프로퍼티
 #### 6.1.9 널이 될 수 있는 타입 확장
 #### 6.1.10 타입 파라미터의 널 가능성
