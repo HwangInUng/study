@@ -360,6 +360,38 @@ info?.let(::println)
 ```
 
 #### 6.1.8 나중에 초기화할 프로퍼티
+코틀린에서는 클래스 안의 널이 될 수 없는 프로퍼티는 생성자 안에서 초기화해야한다.
+또한, 프로퍼티 타입이 널이 될 수 없는 타입이라면 반드시 널이 아닌 값으로 초기화해야한다.
+
+이런 문제를 해결해 주는 것이 lateinit 변경자이다.
+
+```kotlin
+class MyService {
+    fun performAction(): String = "foo"
+}
+
+class MyTest {
+    // lateinit을 사용할 때 var로 프로퍼티 선언
+    private lateinit var myService: MyService? = null
+    @Before
+    fun setUp() {
+        myService = MyService()
+    }
+
+    @Test
+    fun testAction() {
+        Assert.assertEquals(
+            "foo",
+            myService.performAction()
+        )
+    }
+}
+```
+
+- lateinit 프로퍼티는 DI 프레임워크와 사용하는 경우가 많다.
+- lateinit 프로퍼티의 값을 DI 프레임워크가 외부에서 설정해준다.
+- 자바 프레임워크와의 호환성을 위해 lateinit가 지정된 프로퍼티와 가시성이 똑같은 필드를 생성한다.
+
 #### 6.1.9 널이 될 수 있는 타입 확장
 #### 6.1.10 타입 파라미터의 널 가능성
 #### 6.1.11 널 가능성과 자바
