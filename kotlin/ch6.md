@@ -400,15 +400,332 @@ fun main(args: Array<String>) {
 - 자바 프레임워크와의 호환성을 위해 lateinit가 지정된 프로퍼티와 가시성이 똑같은 필드를 생성한다.
 
 #### 6.1.9 널이 될 수 있는 타입 확장
+확장 함수를 정희하면 null 값을 다루는 강력한 도구로 활용할 수 있다.
+직접 변수에 대해 메서드를 호출해도 확장 함수인 메서드가 알아서 널을 처리해주며, 이런 처리는 확장 함수에서만 가능하다.
+
+```kotlin
+fun verifyUserInput (input: String?) {
+    // null 검사를 수행하지 않아도 함수 내부적으로 수행
+    if(input.isNullOrBlank()) {
+        println("Please fill in the required fields")
+    }
+}
+
+fun main(args: Array<String>) {
+    verifyUserInput(" ")
+    verifyUserInput(null)
+}
+```
+isNullOrBlank() 함수의 코드를 들여다 보면 return 시 null 체크를 수행한다.
+
+```kotlin
+public inline fun CharSequence?.isNullOrBlank(): Boolean {
+    contract {
+        returns(false) implies (this@isNullOrBlank != null)
+    }
+
+    // null 또는 isBlank()인 경우를 확인하여 결과를 반환
+    return this == null || this.isBlank()
+}
+```
+
+- 자바에서는 메서드 안의 `this`가 메서드가 호출된 수신 객체를 가리키므로 항상 널이 아니다.
+- 코틀린에서는 널이 될 수 있는 타입의 확장 함수 안에서는 `this`가 널이 될 수 있다는 것이 자바와 다르다.
+- let 사용 시에는 반드시 안전한 호출 연산인 ?. 연산자를 사용해야한다.
+- 또한, 처음에 확장 함수를 작성할 때 널이 될 수 없는 타입으로 작성하고, 널 가능성이 생기면 그때 체크하는 로직을 추가하자.
+
 #### 6.1.10 타입 파라미터의 널 가능성
+코틀린의 함수나 클래스의 모든 타입 파라미터는 기본적으로 널이 될 수 있다.
+
+```kotlin
+fun <T> printHashCode (t: T) {
+    // t가 널일 가능성을 내포하고 있음
+    println(t?.hashCode())
+}
+
+fun main(args: Array<String>) {
+    printHashCode(null)
+}
+```
+
+- 타입 파라미터 T에 대해 추론한 타입은 널이 될 수 있는 Any? 타입이다.
+- 타입 파라미터는 타입 상한을 통해 널이 될 수 없음을 확실히 할 수 있다.
+
+```kotlin
+fun <T: Any> printHashCodeNotNull(t: T) {
+    println(t.hashCode())
+}
+
+fun main(args: Array<String>) {
+    // Null can not be a value of a non-null type TypeVariable(T) 컴파일 에러
+    printHashCodeNotNull(null)
+    // 정상 동작
+    printHashCodeNotNull(42)
+}
+```
+타입 파라미터는 널을 허용하는 타입을 표시할 때 물음표를 타입 이름 뒤에 붙여야 하는 **규칙의 유일한 예외**다.
+
 #### 6.1.11 널 가능성과 자바
+자바 타입 시스템은 널 가능성을 지원하지 않는다. 이런 문제를 어떻게 해결하는지 알아보자.
+- 애너테이션(@NotNull 등)을 이용하여 널 가능성 정보를 표시한다.
+- 코틀린은 널 가능성 애너테이션을 인식한다.
+  - JSR-305 표준
+  - 안드로이드
+  - 젯브레인스 도구 애너테이션 등
+- 널 가능성 애너테이션이 없는 경우 플랫폼 타입이 된다.
+
+플랫폼 타입은 코틀린이 널 관련 정보를 알 수 없는 타입을 의미한다.
+즉, 사용자에 의해 플랫폼 타입에 수행되는 모든 연산에 대한 책임이 주어진다.
+
+```java
+public class Person {
+  // 널 가능성을 알지 못함
+  private final String name;
+
+  public Person (String name) {
+    this.name = name;
+  }
+  // name이 널인지 아닌지 확인 할 수 없다.
+  public String getName() {
+    return name;
+  }
+}
+```
+위 자바 코드에서는 getName()을 호출한 시점에 name 프로퍼티가 널인지 아닌지 에측하기가 어렵다. 그래서 다음과 같이 검사를 해야한다.
+
+```java
+...생략
+public String getName() {
+  if(name != null) return name;
+  return "Unkown";
+}
+```
+
+- 코틀린 컴파일러는 공개(public) 가시성인 코틀린 함수의 널이 아닌 타입인 파라미터와 수신 객체에 대한 널 검사를 추가해준다.
+- 즉, 공개 가시성 함수에 널 값을 사용하면 즉시 예외가 발생한다.
+
+```kotlin
+// 여기서 Person은 자바 코드로 작성된 클래스이다.
+fun yellAtSafe (person: Person) {
+    // 널 값을 처리하여 실행 시점에 예외가 발생하지 않음
+    println((person.name ?: "Anyone").uppercase() + "!!!")
+}
+
+fun main(args: Array<String>) {
+    yellAtSafe(Person(null))
+}
+```
+
+- 자바 API의 대부분 라이브러리는 널 관련 애너테이션을 사용하지 않기 때문에 조심해야한다.
+- 코틀린이 플랫폼 타입을 도입한 것은 널 안정성으로 얻는 이익보다 검사에 드는 비용이 훨씬 더 큰 점을 고려하여 프로그래머에게 제대로 처리할 책임을 부여하는 방법을 택한 것이다.
+- 또한, 코틀린에서는 플랫폼 타입을 선언할 수 없다.
+
+```kotlin
+fun main(args: Array<String>) {
+    val person = Ch6Person("first", "last")
+    val i: Int = person.firstName // Type mismatch. Required: Int Found: String
+}
+```
+책의 예제와는 다른 예외가 발생한다.
+
+추가로 코틀린에서 자바 메서드를 오버라이드할 때 메서드의 파라미터의 널 여부를 결정해야 한다.
+
+```java
+interface StringProcessor {
+  void process(String value);
+}
+```
+위와 같이 String 타입을 파라미터로 받는 추상 메서드를 보유한 인터페이스가 있다고 가정했을 때
+
+```kotlin
+class StringPrinter: StringProcessor {
+  override fun process(value: String) {
+    print(value)
+  }
+}
+
+
+class NullableStringPrinter: StringProcessor {
+  override fun process(value: String?) {
+    if(value != null) {
+      print(value)
+    }
+  }
+}
+```
+
+- 자바 클래스 또는 인터페이스를 코틀린에서 구현하는 경우 널 가능성을 제대로 처리하는 것이 중요하다.
+- 코틀린 컴파일러는 널이 될 수 없는 타입으로 선언한 모든 파라미터에 대해 널이 아님을 검사하는 단언문을 만들어 준다.
 
 ---
 
 ### 6.2 코틀린의 원시 타입
+코틀린은 원시 타입과 래퍼 타입을 구분하지 않고 동작한다.
+
 #### 6.2.1 원시 타입: Int, Boolean 등
+코틀린은 아래와 같이 원시타입과 래퍼타입을 구분하지 않고, 항상 같은 타입으로 사용한다.
+
+```kotlin
+val i: Int = 1
+val list: List<Int> = listOf(1, 2, 3)
+```
+
+또한, 숫자 타입 등 원시 카입의 값에 대해 메서드 호출이 가능하다.
+```kotlin
+fun showProgress (progress: Int) {
+    // 숫자 타입의 함수 호출
+    val percent = progress.coerceIn(0, 100)
+    println("We're ${percent}% done!")
+}
+
+fun main(args: Array<String>) {
+    showProgress(146)
+}
+```
+
+- 코틀린은 항상 객체로 표현하는 것이 아니다.
+- 대부분 코틀린의 Int 타입은 자바의 int 타입으로 컴파일된다.
+- 제네릭 클래스를 사용하는 경우는 불가능하다.
+
+|구분|타입|
+|---|---|
+|정수 타입|Byte, Short, Int, Long|
+|부동소수점 타입|Float, Double|
+|문자 타입|Char|
+|불리언 타입|Boolean|
+
+Int와 같은 코틀린 타입에는 널 참조가 들어갈 수 없기 때문에 자바 원시 타입으로 컴파일이 가능하다.
+
 #### 6.2.2 널이 될 수 있는 원시 타입: Int?, Boolean? 등
+널이 될 수 있는 코틀린 타입은 자바 원시 타입으로 표현이 불가능하며, 래퍼 타입으로 컴파일된다.
+
+```kotlin
+// age의 초기값을 null로 부여
+data class Pserson (val name: String, val age: Int? = null) {
+    fun isOlderThan (other: Pserson): Boolean? {
+        if (age == null || other.age == null) {
+            return null
+        }
+
+        return age > other.age
+    }
+}
+
+fun main(args: Array<String>) {
+    println(Pserson("Sam", 35).isOlderThan(Pserson("Amy", 42)))
+    // age가 null이기 때문에 이 경우 Integer형으로 컴파일
+    println(Pserson("Sam", 35).isOlderThan(Pserson("Jane")))
+}
+```
+
+- Int? 타입의 두 값을 직접 비교할 수 없다.
+- 그렇기 때문에 null 체크를 두 값 모두 수행해야한다.
+
+```kotlin
+val list = listOf(1, 2, 3)
+```
+
+위 코드에서 사용된 값들은 모두 Integer 타입이며 이유는 아래와 같다.
+- List는 기본적으로 제네릭을 통해 타입을 받는다.
+- JVM은 제네릭을 구현할 때 타입 인자로 원시 타입을 허용하지 않는다.
+- 따라서 자바와 코틀린은 제네릭 클래스에 항상 박스 타입을 사용해야 한다.
+
 #### 6.2.3 숫자 변환
+코틀린과 자바의 가장 큰 차이점 중 하나는 숫자를 변환하는 방식이다.
+
+- 자바는 한 타입의 숫자를 다른 타입의 숫자로 자동 변환한다.
+- 코틀린은 자동 변환하지 않으며, 심지어 원래 타입의 범위보다 넓은 경우조차도 자동 변환이 불가능하다.
+
+```kotlin
+val intNumber = 1
+val longNumber: Long = i.toLong()
+```
+
+위와 같이 직접 변환 메서드를 호출해야 한다. 이유는 다음과 같다.
+- 개발자의 혼란을 피하기 위해 타입 변환을 명시하기로 결정
+- 박스 타입을 비교하는 경우 문제 발생
+- 두 박스 타입 간의 equals 메서드는 그 안에 값이 아닌 박스 타입 객체를 비교
+
+```kotlin
+val x = 1
+val list = listOf(1L, 2L, 3L)
+
+// 명시적으로 타입을 변환
+println(x.toLong() in list)
+```
+
+**숫자 리터럴에 _ 사용**
+긴 숫자 리터럴을 다룰 때 가독성 높게 표기가 가능하여 금액, 바이트 크기, 긴 상수 값 등을 표현할 때 유용하다.
+
+```kotlin
+val oneMillion = 1_000_000
+val creditCardNumber = 1234_5678_9012_3456L
+val bytes = 0b11010010_01101001_10010100_10010010
+```
+
 #### 6.2.4 Any, Any?: 최상위 타입
+자바의 Object 클래스와 유사한 역할을 하는 타입으로 모든 널이 될 수 없는 타입의 조상 타입이다.
+
+- 자바에서는 Object가 참조 타입들의 정점으로 역할을 수행하며 원시 타입은 적용되지 못한다.
+- 코틀린의 Any는 원시 타입을 포함한 모든 타입의 조상 타입으로 동작한다.
+- 단, Any도 null은 들어갈 수 없다.
+- toString, equals, hashCode는 Any에 정의된 메서드를 상속한 것이다.
+
 #### 6.2.5 Unit 타입: 코틀린의 void
+자바의 void와 같은 기능을 하는 타입이다. 즉, 반환 값이 없는 경우 사용한다고 이해하면 편하다.
+
+- 코틀린 함수의 반환 타입이 Unit이고, 그 함수가 제네릭 함수를 오버라이드 하지 않는다면 자바 void 함수로 컴파일된다.
+- Unit은 모든 기능을 갖는 일반적 타입이며, void와 달리 인자로 사용 가능하다.
+
+```kotlin
+interface Processor<T> {
+  fun process(): T
+}
+
+class NoResultProcessor: Processor<Unit> {
+  override fun process () {
+    println("")
+  }
+}
+```
+자바로 위 코드를 표현하면 다음과 같다.
+```java
+interface Processor<T> {
+    T process();
+}
+
+class NoResultProcessor implements Processor<Void> {
+
+    @Override
+    public Void process() {
+        System.out.println("");
+        // Void를 반환 타입으로 사용하면 반드시 null을 반환해야한다.
+        // 코틀린의 Unit에 대응하는 값이 없기 때문이다.
+        return null; 
+    }
+}
+```
+제네릭에 T를 전달하는 구조를 유지하기 위해 자바에서는 Unit에 대응되는 값이 없기 때문에 Void를 제네릭으로 전달해주고, null을 반환한다.
+
 #### 6.2.6 Nothing 타입: 이 함수는 결코 정상적으로 끝나지 않는다
+'반환 값'이라는 개념 자체가 의미 없는 함수가 일부 존재하는데 그런 경우를 표현하기 위해 Nothing을 사용한다.
+
+```kotlin
+fun fail (message: String): Nothing {
+    throw IllegalStateException(message)
+}
+
+fun main(args: Array<String>) {
+    fail("Error")
+}
+```
+
+- Nothing은 아무 값도 포함하지 않는다.
+- 함수의 반환 타입이나 반환타입으로 쓰일 타입 파라미터로만 쓸 수 있다.
+- 컴파일러는 Nothing이 반환 타입인 함수가 결코 정상 종료되지 않음을 알고 그 함수를 호출하는 코드를 분석할 때 사용한다.
+
+```kotlin
+val address = company.address ?: fail("No address")
+```
+
+컴파일러는 위 코드에서 엘비스 연산자의 우항에서 예외가 발생할 수 있다는 사실을 파악하고, address 값이 널이 아님을 추론할 수 있다.
