@@ -729,3 +729,162 @@ val address = company.address ?: fail("No address")
 ```
 
 컴파일러는 위 코드에서 엘비스 연산자의 우항에서 예외가 발생할 수 있다는 사실을 파악하고, address 값이 널이 아님을 추론할 수 있다.
+
+---
+
+### 6.3 컬렉션과 배열
+
+#### 6.3.1 널 가능성과 컬렉션
+컬렉션 안에 널 값을 넣을 수 있는 여부는 어떤 변수의 값이 널이 될 수 있는지와 마찬가지로 중요하다.
+
+```kotlin
+// 일반적 사용
+fun readNumbers (reader: BufferedReader): List<Int?> {
+    // 널이 될 수 있는 제네릭
+    val result = ArrayList<Int?>()
+
+    // lineSequence()는 지연평가를 지원한다
+    // 코틀린의 Sequnece 형태로 감싸서 처리
+    for(line in reader.lineSequence()) {
+        try {
+            val number = line.toInt()
+            result.add(number)
+        } catch (e: NumberFormatException) {
+            result.add(null)
+        }
+    }
+
+    return result
+}
+
+// 축약 : String.toIntOrNull()
+fun readNumbers(reader: BufferedReader): List<Int?> {
+    val result = ArrayList<Int?>()
+
+    for (line in reader.lineSequence()) {
+        result.add(line.toIntOrNull())
+    }
+
+    return result
+}
+```
+
+`String.toIntOrNull()`은 코틀린 1.1부터 나온 것이 아니라 코틀린 1.0부터 이미 존재했었다.
+
+```kotlin
+List<Int?>
+List<Int>?
+List<Int?>?
+```
+
+- List<Int?> : 리스트의 각 원소가 널이 될 수 있는 타입이라고 지정
+- List<Int>? : 리스트가 가리키는 변수에 널이 들어갈 수 있지만 List 각 원소에 널이 들어갈 순 없음
+- List<Int?>? : 리스트를 가리키는 변수에 널이 들어갈 수도 있고, 각 원소에도 들어갈 수 있음
+
+```kotlin
+fun addValidNumbers (numbers: List<Int?>) {
+    var sumOfValidNumbers = 0
+    var invalidNumbers = 0
+
+    for (number in numbers) {
+        if(number != null) {
+            sumOfValidNumbers += number
+        } else {
+            invalidNumbers++
+        }
+    }
+
+    println("Valid numbers :: $sumOfValidNumbers")
+    println("Invalid numbers :: $invalidNumbers")
+}
+
+fun main(args: Array<String>) {
+    val list = listOf(1, null, 42)
+    addValidNumbers(list)
+}
+```
+
+위 코드처럼 컬렉션에서 널 값을 걸러내는 경우가 자주 발생하기 때문에 `filterNotNull`이라는 표준 라이브러리 함수를 제공한다.
+```kotlin
+fun addValidNumbers (numbers: List<Int?>) {
+    // null이 아님을 보장하므로 List<Int> 타입
+    val validNumbers = numbers.filterNotNull()
+
+    println("Valid numbers :: ${validNumbers.sum()}")
+    println("Invalid numbers :: ${numbers.size - validNumbers.size}")
+}
+
+fun main(args: Array<String>) {
+    val list = listOf(1, null, 42)
+    addValidNumbers(list)
+}
+```
+
+#### 6.3.2 읽기 전용과 변경 가능한 컬렉션
+자바와 코틀린 컬렉션의 가장 큰 차이는 코틀린에는 읽기 전용과 변경 가능한 컬렉션이 있다는 점이다.
+
+- kotlin.collections.Collection : size, iterator(), contains(), isEmpty() 등 수정에 대한 메서드가 없음
+- kotlin.collections.MutableCollection : add(), remove(), clear() 등 수정에 대한 메서드 보유
+  - Collection 인터페이스를 확장
+  - 원소의 추가, 삭제, 모두 지우기 등을 지원
+
+컬렉션은 가능하면 항상 읽기 전용 인터페이스를 사용하여 데이터에 어떤 일이 벌어지는지를 더 쉽게 이해하자.
+
+원본의 변경을 막기 위해 컬렉션을 복사하는(방어적 복사, defensive copy) 부분에 대한 코드를 보자.
+```kotlin
+// 읽기 전용과 변경 가능한 컬렉션을 인자로 전달
+fun <T>copyElements(source: Collection<T>, target: MutableCollection<T>) {
+    // 원본을 변경 가능한 컬렉션으로 이동
+    for (item in source) {
+        target.add(item)
+    }
+}
+
+fun main(args: Array<String>) {
+    val source: Collection<Int> = arrayListOf(3, 4, 2)
+    val target: MutableCollection<Int> = arrayListOf(1)
+
+    copyElements(source, target)
+    println(target)
+}
+```
+만약 여기서 target이 읽기 전용이라면 아래와 같은 에러가 발생한다.
+
+```kotlin
+fun <T>copyElements(source: Collection<T>, target: Collection<T>) {
+    for (item in source) {
+        // Unresolved reference: add
+        target.add(item)
+    }
+}
+```
+
+읽기 전용 인터페이스 타입 변수를 사용할 때 그 변수는 수많은 참조 중 하나일 수 있다.
+이런 경우에는 변경 가능한 인터페이스의 참조가 있을 수도 있기 때문에 읽기 전용이라고 해서 반드시 변경 불가능한 컬렉션을 필요는 없다.
+
+```kotlin
+fun main() {
+    val mutableList: MutableList<Int> = mutableListOf(1, 2, 3)
+    // 같은 리스트를 읽기 전용 인터페이스로 참조
+    val readOnlyList: List<Int> = mutableList
+
+    println("Before modification:")
+    println("mutableList: $mutableList")
+    println("readOnlyList: $readOnlyList")
+
+    // mutableList를 통해 컬렉션을 변경
+    mutableList.add(4)
+
+    // readOnlyList도 변경된 내용을 반영
+    println("After modification:")
+    println("mutableList: $mutableList")
+    println("readOnlyList: $readOnlyList")
+}
+```
+
+위 코드에서 주의 사항은 MutableList를 List의 참조로 받을 순 있지만 List를 MutableList의 참조로 받을 수는 없다.
+
+- List는 읽기 전용이기 때문에 MutableList의 메서드 중 일부가 수행될 수 없다.
+- MutableList는 변경 가능하기 때문에 List의 모든 메서드 수행이 가능하다.
+
+또한, 이런 경우에 병렬 실행한다면 동시성 오류 발생을 야기할 수 있기 때문에 일긱 전용 컬렉션이 항상 스레드 안전하지 않다는 것을 인식해야한다.
