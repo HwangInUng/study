@@ -888,3 +888,143 @@ fun main() {
 - MutableList는 변경 가능하기 때문에 List의 모든 메서드 수행이 가능하다.
 
 또한, 이런 경우에 병렬 실행한다면 동시성 오류 발생을 야기할 수 있기 때문에 일긱 전용 컬렉션이 항상 스레드 안전하지 않다는 것을 인식해야한다.
+
+#### 6.3.3 코틀린 컬렉션과 자바
+코틀린은 모든 자바 컬렉션 인터페이스마다 읽기 전용과 변경 가능한 인터페이스 두 가지 표현을 제공한다.
+
+- 변경 가능한 인터페이스의 구조는 java.util 패키지의 구조를 그대로 옮겨 놓았다.
+- 변경 가능한 인터페이스는 자신과 대응하는 읽기 전용 인터페이스를 확장한다.
+
+|컬렉션 타입|읽기 전용|변경 가능|
+|---|---|---|
+|List|listOf|mutableListOf, arrayListOf|
+|Set|setOf|mutableSetOf, hashSetOf, linkedSetOf, sortedSetOf|
+|Map|mapOf|mutableMapOf, hashMapOf, linkedMapOf, sortedMApOf|
+
+- 읽기 전용 컬렉션 생성 함수 : ArrayList, LinkedHashSet, LinkedHashMap 등을 기반으로 한 불변 Wrapper나 특수 구현을 사용한다.
+- 변경 가능한 컬렉션 함수 : 위 컬렉션 들을 직접 반환한다.
+
+자바 메서드를 호출할 때 컬렉션을 인자로 넘겨야 한다면 Collection or MutableCollection을 직접 전달하면된다.
+다만, 코틀린에서 읽기 전용 컬렉션을 자바 메서드의 인자로 넘기는 경우 자바에서의 구분이 없기 때문에 변경될 수 있음을 유의해야한다.
+
+#### 6.3.4 컬렉션을 플랫폼 타입으로 다루기
+자바에서 선언한 컬렉션 타입의 변수는 코틀린에서 플랫폼 타입으로 간주한다.
+플랫폼 타입인 컬렉션은 기본적으로 변경 가능성을 알 수 없다. 이 말은 어느쪽으로든 다룰 수 있다와 같다.
+
+- 컬렉션 타입이 시그니처에 들어간 자바 메서드 구현을 오버라이드 할 때 읽기 전용과 변경 가능 컬렉션의 차이가 문제가 된다.
+- 오버라이드하려는 메서드의 자바 컬렉션 타입을 어떤 코틀린 컬렉션 타입으로 표현할지 결정해야한다.
+
+```java
+interface FileContentProcessor {
+  void processContents(File path, byte[] binaryContents, List<String> textContents);
+}
+```
+
+코틀린으로 구현하려면 다음을 선택해야한다.
+
+- 리스트에 들어 갈 내용이 텍스트로 표현할 수 없는 경우가 있어 널이 될 수 있다.
+- 파일의 각 줄이 널이 될 수 없으니 리스트의 원소도 널이 될 수 없다.
+- 파일의 내용을 바꿀 필요 없는 읽기 전용이다.
+
+```kotlin
+class FileIndexer : FileContentProcessor {
+    override fun processContents(path: File, binaryContents: ByteArray?, textContents: List<String>?) {
+        //...
+    }
+}
+```
+
+이렇듯 자바에서 가져온 컬렉션에 대해 어떤 작업을 수행해야 할지 검토하면 쉽게 구현이 가능하다.
+
+#### 6.3.5 객체의 배열과 원시 타입의 배열
+코틀린의 배열에 대해 어떻게 생겼는지 한번 더 확인하자.
+
+```kotlin
+fun main(args: Array<String>) {
+    for (index in args.indices) {
+        println("Argument $index is: ${args[index]}")
+    }
+}
+```
+
+코틀린 배열은 타입 파라미터를 받는 클래스다.
+
+- arrayOf()에 원소를 넘겨 배열을 생성
+- arrayOfNulls()에 정수 값을 인자로 넘기면 모든 원소가 null이고 인자로 넘긴 정수와 같은 크기의 배열 생성
+- Array 생성자는 배열 크기와 람다를 인자로 받는데 각 원소가 널이 아닌 배열을 만드는 경우 사용
+
+```kotlin
+fun main(args: Array<String>) {
+    val array1 = arrayOf(1, 2, 3)
+    val array2 = arrayOfNulls<Int>(10)
+    val array3 = Array<Int>(10) { _ -> 2 }
+
+    println(array1.contentToString())
+    println(array2.contentToString())
+    println(array3.contentToString())
+}
+
+>> [1, 2, 3]
+>> [null, null ...., null]
+>> [2, 2, 2, 2, ...., 2]
+```
+
+Array를 사용할 때는 타입 파라미터를 생략해도 컴파일러가 타입 추론을 수행한다.
+
+vararg(가변 인자) 메서드에 컬렉션을 넘기는 방법을 알아보자.
+```kotlin
+fun main(args: Array<String>) {
+    // 컬렉션으로 데이터 생성
+    val strings = listOf("a", "b", "c")
+
+    // vararg 인자 전달을 위해 스프레드 연산자 사용
+    println("%s/%s/%s/".format(*strings.toTypedArray()))
+}
+```
+데이터가 컬렉션에 들어있는 경우 가변 인자로 전달할 수 없기 때문에 배열로 전환하는 `toTypedArray()` 메서드를 사용하여 전달한다.
+
+- 배열 타입의 타입 인자도 항상 객체 타입이다.
+- 박싱되지 않은 배열이 필요한 경우 특별한 배열 클래스를 사용해야 한다.
+
+원시 타입 배열은 다음과 같이 정의할 수 있다.
+```kotlin
+IntArray
+ByteArray
+CharArray
+...
+```
+
+- 각 배열 생성자는 size 인자를 받아서 디폴트 값으로 초기화된 배열을 반환한다.
+- 팩토리 함수(inArrayOf 등)는 여러 값을 가변 인자로 받아서 그런 값이 들어간 배열을 반환한다.
+- 크기와 람다를 인자로 받는 생성자를 사용한다.
+
+```kotlin
+val fiveZeros = IntArray(5)
+val fiveZerosToo = intArrayOf(0, 0, 0, 0, 0)
+val squares = IntArray(5) -> {i -> (i+1) * (i+1)}
+```
+
+위 방법과 다르게 박싱된 값이 들어있는 컬렉션이나 배열을 `toIntArray()`등의 메서드를 통해 박싱하지 않은 값의 배열로 변환할 수 있다.
+
+- 코틀린의 배열은 컬렉션에서 사용할 수 있는 모든 확장 함수를 사용할 수 있다.
+- filter, map 등을 배열에 사용해도 똑같이 동작한다.
+- 단, 이렇게 사용된 함수들의 반환은 리스트라는 점을 유의해야한다.
+
+```kotlin
+fun main(args: Array<String>) {
+    // List 생성
+    val list = listOf(1, 2, 3)
+    // IntArray로 변환
+    val array = list.toIntArray()
+    
+    // 타입을 List로 명시
+    // filter를 사용하여 2만 필터링
+    val listByFilteredArray:List<Int> = array.filter { it -> it == 2 }
+
+    println(array.contentToString())
+    println(listByFilteredArray)
+}
+
+>> [1, 2, 3]
+>> [2]
+```
