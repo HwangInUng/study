@@ -382,7 +382,7 @@ fun main(args: Array<String>) {
 - 다양한 파라미터 타입에 대해 오버로딩을 수행해야 할 수 있음
 
 #### 7.3.2 in 관례
-객체가 컬렉션에 포함되어 있는지 멈버십 검사(membership tet)를 한다. 이 때 in과 대응하는 함수는 `contains`다.
+객체가 컬렉션에 포함되어 있는지 멤버십 검사(membership tet)를 한다. 이 때 in과 대응하는 함수는 `contains`다.
 
 ```kotlin
 // in 사용 케이스
