@@ -408,3 +408,78 @@ fun main(args: Array<String>) {
 - 우항 객체는 `contains` 메서드의 수신 객체로 지정
 - 좌항 객체는 `contains` 메서드의 인자로 전달
 - until의 열린 범위는 끝 값을 포함하지 않는 범위를 의미(10~20일 경우 끝 값 20을 제외한 10~19)
+
+`contains` 부분을 자바 코드로 표현하면 다음과 같다.
+
+```java
+// contains 메서드 구현
+public boolean contains(Point p) {
+    // until 대신 >=, < 연산자 사용
+    // and 연산자를 x, y 각 두 번씩 사용
+    return p.getX() >= upperLeft.getX() && p.getX() < lowerRight.getX()
+            && p.getY() >= upperLeft.getY() && p.getY() < lowerRight.getY();
+}
+```
+
+#### 7.3.3 rangeTo 관례
+`..` 연산자를 통해 rangeTo 함수를 간략하게 표현하는 방법에 대해 알아보자.
+
+- rangeTo는 아무 클래스에나 정의 가능
+- 다만 `Comparable` 인터페이스를 구현한 클래스는 rangeTo 불필요
+- 코틀린 표준 라이브러리에 모든 `Comparable` 객체에 대해 적용 가능한 rangeTo 함수가 들어있음
+
+```kotlin
+fun main(args: Array<String>) {
+    val now = LocalDate.now() // 현재 날짜
+    val vacation = now..now.plusDays(10) // 현재로부터 10일 후
+    
+    // 현재 날짜 기준으로 다음주에 휴가 기간이 표함되어 있는지 확인
+    println(now.plusWeeks(1) in vacation)
+}
+```
+
+- `now..now.plusDays(10)`은 `now.rangeTo(now.plusDays(10))`으로 컴파일러에 의해 변환
+- `Comparable`에 대한 확장 함수로서 rangeTo()가 동작
+- rangeTo 연산자는 다른 산술 연산자보다 우선순위가 낮음
+- `()`를 이용해 인자를 감싸주면 명시적으로 표현되어 가독성 향상
+
+#### 7.3.4 for 루프를 위한 iterator 관례
+범위 검사와 똑같이 in 연산자를 사용하는 for 루프는 어떻게 관례를 적용하는지 알아보자.
+
+- iterator 메서드를 확장 함수로 정의한다.
+- 클래스 안에 직접 iterator 메서드를 구현하거나 표준 라이브러리에 확장 함수로 정의되어져 있다.
+
+```kotlin
+// iterator 정의
+operator fun ClosedRange<LocalDate>.iterator(): Iterator<LocalDate> =
+    // 날짜 범위를 반복하는 이터레이터 정의
+    object : Iterator<LocalDate> {
+        var current = start
+
+        // compareTo 관례를 이용
+        override fun hasNext() = current <= endInclusive
+
+        // 현재 날짜를 먼저 반환하고, 다음 날짜로 이동
+        // 해당 부분은 클로저를 통해 next 함수 외부에 정의된 변수 상태를 지속적으로 참조
+        override fun next() = current.apply {
+            current = plusDays(1)
+        }
+    }
+
+fun main(args: Array<String>) {
+    val newYear = LocalDate.ofYearDay(2020, 1)
+    val daysOff = newYear.minusDays(1)..newYear
+
+    for(dayoff in daysOff) {
+        println(dayoff)
+    }
+}
+```
+
+- 범위 객체에 전달된 타입에 대한 이터레이터를 반환하는 확장 함수 정의
+- LocalDate 객체가 반복되면서 수행될 작업을 내부에 정의
+- 호출 시 범위를 지정하고, for 루프를 통해 해당 동작 수행
+
+---
+
+
