@@ -480,6 +480,25 @@ fun main(args: Array<String>) {
 - LocalDate 객체가 반복되면서 수행될 작업을 내부에 정의
 - 호출 시 범위를 지정하고, for 루프를 통해 해당 동작 수행
 
+**컬렉션과 범위 객체**
+|특성|컬렉션|범위 객체|
+|---|---|---|
+|in 연산자 동작|contains|contains|
+|for 루프|iterator|iterator|
+|범위 지원 여부|x|o|
+|타입|List, Set, Map 등|IntRange, ClosedRange 등|
+
+위 표에서 볼 수 있듯이 컬렉션과 범위 객체에서의 in 사용 관례 부분은 유사한 부분이 많다.
+그렇다면 멤버십 검사와 for 루프 관점에서는 어떻게 적용되는지 알아보자.
+
+|기능|멤버십 검사|for 루프 반복|
+|---|---|---|
+|문맥|if (element in collection)|for (element in collection)|
+|메서드|fun contains(element:T)|fun iterator()|
+|결과|Boolean|Iterator|
+|용도|특정 요소가 컬렉션에 존재하는지 여부|컬렉션 요소를 순회|
+
+
 ---
 
 
