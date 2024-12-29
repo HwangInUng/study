@@ -220,3 +220,191 @@ fun main(args: Array<String>) {
 
 ---
 
+### 7.2 비교 연산자 오버로딩
+자바의 equals나 compareTo를 == 비교 연산자를 직접사용 하여 비교 연산을 수행해보자.
+
+#### 7.2.1 동등성 연산자 : equals
+코틀린에서는 `==` 연산자 호출 시 `equals` 호출로 컴파일한다.
+
+- `==`와 `!=`는 내부에서 인자가 널인지 검사
+- 널이 될 수 있는 값에도 적용이 가능
+
+**equals 정의**
+```kotlin
+// 직접 정의
+override fun equals(obj: Any?): Boolean { // Any에 정의된 메서드 오버라이딩
+    // 객체의 동일성 비교
+    if (obj === this) return true
+    // 파라미터 타입 검사
+    if (obj !is Point) return false
+
+    // 스마트 캐스트 적용
+    return obj.x == x && obj.y == y
+}
+```
+
+위 코드를 자바로 표현하면 다음과 같다.
+```java
+@Override
+public boolean equals(Object obj) {
+    // 동일 객체 비교
+    if (this == obj) {
+        return true;
+    }
+
+    // null 체크와 타입 검사
+    if (!(obj instanceof Point)) {
+        return false;
+    }
+
+    // 타입 변환 후 비교
+    Point other = (Point) obj;
+    return this.x == other.x && this.y == other.y;
+}
+```
+
+- `==`를 이용해 객체의 동일성을 비교
+- 널 여부와 타입 검사를 수행
+- 스마트캐스트 적용이 불가능하기 때문에 타입 변환 수행
+
+코틀린에서 `==`를 사용하여 equals를 대신할 때 주의사항은 다음과 같다.
+
+- `===`을 이용해 수신 객체와 동일성 검사를 수행하며, `===`는 오버로딩이 불가능
+- `Any`에서 상속 받은 `equals`가 확장 함수보다 우선순위가 높게 적용되어 확장 함수로 정의 불가능
+- `Any`의 equals에는 `operator`가 붙어있지만 상속하는 클래스들에게는 필요 없음
+
+#### 7.2.2 순서 연산자 : compareTo
+자바에서는 `Comparable` 객체를 호출하거나 길게 메서드를 호출하여 한 객체와 다른 객체의 크기를 비교할 수 있다. 코틀린에서는 어떻게할까?
+
+- `Comparable` 인터페이스를 지원
+- compareTo 메서드 호출을 `<`, `>`, `<=`, `>=`와 같은 비교 연산자를 사용
+- 반환하는 값은 Int
+
+```kotlin
+// Comparable 인터페이스 구현
+class Human(val firstName: String, val lastName: String) : Comparable<Human> {
+    override fun compareTo(other: Human): Int {
+        return compareValuesBy(this, other, Human::lastName, Human::firstName)
+    }
+}
+
+fun main(args: Array<String>) {
+    val p1 = Human("Alice", "Smith")
+    val p2 = Human("Bob", "Johnson")
+
+    // Human 클래스의 first, last name을 각각 비교
+    println(p1 < p2)
+}
+```
+
+위에서 정의된 `Comparable` 인터페이스는 자바 쪽의 컬렉션 정렬 메서드 등에 사용이 가능하다.
+
+**compareValuesBy()**
+```kotlin
+public fun <T> compareValuesBy(a: T, b: T, vararg selectors: (T) -> Comparable<*>?): Int {
+    require(selectors.size > 0)
+    return compareValuesByImpl(a, b, selectors)
+}
+
+// 실제 구현
+private fun <T> compareValuesByImpl(a: T, b: T, selectors: Array<out (T) -> Comparable<*>?>): Int {
+    for (fn in selectors) {
+        val v1 = fn(a)
+        val v2 = fn(b)
+        val diff = compareValues(v1, v2)
+        if (diff != 0) return diff
+    }
+    return 0
+}
+```
+
+- 첫 번째, 두 번째 인자를 `compareValues()`로 전달해 `===` 연산자를 통해 동일성 체크
+- 같지 않다면 즉시 결과를 반환하고, 같다면 `selectors`로 전달된 비교 함수를 통해 두 객체를 비교
+- 각 비교 함수는 람다 또는 프로터티/메서드 일 수 있음
+
+마지막으로 `Comparable` 인터페이스를 구현하는 모든 자바 클래스를 간결한 연산자 구문으로 비교가 가능하다.
+
+---
+
+### 7.3 컬렉션과 범위에 대해 쓸 수 있는 관례
+컬렉션을 다룰 때 가장 많이 사용하는 다음 두 가지를 더욱 간단하게 하는 연산자 구문을 알아보자.
+
+- 인덱스를 통한 원소 검색
+- 컬렉션에 특정 원소 포함 여부
+
+#### 7.3.1 인덱스로 원소에 접근 : get과 set
+`somMap[key] = value` 처럼 인덱스 연산자를 사용해 원소를 읽고, 쓰는 방법에 대해 알아보자.
+
+**원소를 읽는 연산 get**
+```kotlin
+// get, set 사용 인덱스 연산
+operator fun Point.get (index: Int): Int {
+    // 인덱스를 수신 객체로 하는 when 표현식
+    return when(index) {
+        0 -> x
+        1 -> y
+        else -> throw IndexOutOfBoundsException("Invalid coordinate $index")
+    }
+}
+
+fun main(args: Array<String>) {
+    val p = Point(10, 20)
+
+    // get을 호출
+    println(p[0])
+    println(p[1])
+}
+```
+
+**원소를 쓰는 연산 set**
+```kotlin
+// 변경 가능한 Point 클래스 정의
+data class MutablePoint(var x: Int, var y: Int)
+
+operator fun MutablePoint.set(index: Int, value: Int) {
+    when (index) {
+        0 -> x = value
+        1 -> y = value
+        else -> throw IndexOutOfBoundsException("Invalid coordinate $index")
+    }
+}
+
+fun main(args: Array<String>) {
+    val p = MutablePoint(10, 20)
+
+    p[1] = 100
+    println(p)
+}
+```
+
+- map의 경우 key와 동일한 타입으로 연산자의 파라미터를 정의
+- 2차원 행렬 또는 배열의 경우 `[row, col]` 형태로 메서드 호출 가능
+- 다양한 파라미터 타입에 대해 오버로딩을 수행해야 할 수 있음
+
+#### 7.3.2 in 관례
+객체가 컬렉션에 포함되어 있는지 멈버십 검사(membership tet)를 한다. 이 때 in과 대응하는 함수는 `contains`다.
+
+```kotlin
+// in 사용 케이스
+data class Rectangle(val upperLeft: Point, val lowerRight: Point)
+
+operator fun Rectangle.contains(p: Point): Boolean {
+    // in 연산자를 사용해 좌표가 사각형 안에 있는지 확인
+    // until은 <=와 <를 사용해 범위를 정의
+    return p.x in upperLeft.x until lowerRight.x &&
+            p.y in upperLeft.y until lowerRight.y
+}
+
+fun main(args: Array<String>) {
+    val rect = Rectangle(Point(10, 20), Point(50, 50))
+    println(Point(20, 30) in rect)
+    println(Point(5 ,5) in rect)
+}
+
+>> true
+>> false
+```
+
+- 우항 객체는 `contains` 메서드의 수신 객체로 지정
+- 좌항 객체는 `contains` 메서드의 인자로 전달
+- until의 열린 범위는 끝 값을 포함하지 않는 범위를 의미(10~20일 경우 끝 값 20을 제외한 10~19)
