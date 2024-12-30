@@ -501,4 +501,204 @@ fun main(args: Array<String>) {
 
 ---
 
+### 7.4 구조 분해 선언과 component 함수
+복합적인 값을 분해해서 여러 다른 변수를 한꺼번에 초기화 할 수 있는 구조 분해 선언에 대해 알아보자.
+
+- 괄호를 이용해 여러 변수를 묶어서 선언한다.
+- 구조 분해 선언의 각 변수는 `componentN` 이라는 함수를 통해 초기화한다.
+- data class의 주 생성자에 들어있는 프로퍼티는 컴파일러가 자동으로 `componentN` 함수를 만들어준다.
+
+구조 분해 선언은 함수가 반환하는 값을 쉽게 풀어서 여러 변수에 넣을 수 있다.
+
+```kotlin
+// 구조 분해 선언
+data class NameComponents(val name: String, val extension: String)
+
+fun splitFilename(fullName: String): NameComponents {
+    // 파일명과 확장자를 분리
+    val result = fullName.split('.', limit = 2)
+
+    // 데이터 클래스 인스턴스 반환
+    return NameComponents(result[0], result[1])
+}
+
+fun main(args: Array<String>) {
+    val (name, ext) = splitFilename("example.kt")
+    println("$name.$ext")
+}
+```
+
+크기가 정해진 배열 또는 컬렉션을 이용할 경우 다음과 같이 사용 가능하다.
+
+```kotlin
+fun splitFilename(fullName: String): NameComponents {
+    // 파일명과 확장자를 분리
+    val (name, ext) = fullName.split('.', limit = 2)
+
+    // 데이터 클래스 인스턴스 반환
+    return NameComponents(name, ext)
+}
+```
+
+- `componentN`은 맨 앞의 다섯 원소에 대하여 제공된다.
+- 원소가 정의된 인덱스와 호출하는 인덱스가 다른 경우 예외가 발생한다.
+
+```kotlin
+fun main(args: Array<String>) {
+    val (one, two, three, four, five) = listOf(1, 2, 3)
+    println(four)
+}
+
+>>Exception in thread "main" java.lang.ArrayIndexOutOfBoundsException: Index 3 out of bounds for length 3
+```
+
+#### 7.4.1 구조 분해 선언과 루프
+변수 선언이 들어갈 수 있는 장소에는 어디든 구조 분해 선언을 사용할 수 있다.
+
+```kotlin
+// map 구조 분해
+fun printEntries(map:Map<String, String>) {
+    // key와 value를 구조 분해와 객체 이터레이션
+    for ((key, value) in map) {
+        println("$key -> $value")
+    }
+}
+
+fun main(args: Array<String>) {
+    val map = mapOf("oracle" to "java", "jetbrains" to "kotlin")
+    printEntries(map)
+}
+```
+
+- 코틀린에서는 Map에 대한 직접적인 for 루프가 가능하다.
+- Map.Entry에 대한 확장 함수로 `component1`과 `component1`를 제공한다.
+
+---
+
+### 7.5 프로퍼티 접근자 로직 재활용 : 위임 프로퍼티
+
+- 값을 뒷받침하는 필드에 단순히 저장하는 것보다 더 복잡한 방식으로 작동하는 프로퍼티를 쉽게 구현 가능하다.
+- 접근자 로직을 매번 재구현할 필요가 없다.
+- 위임 객체(delegate)를 이용해 작업을 처리하게 맡긴다.
+
+#### 7.5.1 위임 프로퍼티 소개
+**기본 문법**
+```kotlin
+class Foo {
+    var p: Type by Delegate()
+}
+```
+
+- p의 접근자 로직을 다른 객체에게 위임
+- by 뒤에 있는 식을 계산하여 위임에 쓰일 객체를 얻음
+
+```kotlin
+class Foo {
+    // 컴파일러가 생성한 도우미 프로퍼티
+    private val delegate = Delegate()
+    var p: Type
+
+    // 접근자들
+    set(value: Type) = delegate.setValue(..., value)
+    get() = delegate.getValue(...)
+}
+```
+
+- 접근자는 프로퍼티 P와 연관된 동작을 정의
+- Type은 프로퍼티 P의 데이터 타입으로, get 접근자의 반환 타입과 set 접근자의 매개변수 타입을 결정
+
+```kotlin
+class Delegate {
+    // 백킹 필드 정의
+    private var backingField: String = "default"
+
+    operator fun getValue(thisRef: Any?, property: KProperty<*>): String {
+        return backingField
+    }
+
+    operator fun setValue(thisRef: Any?, property: KProperty<*>, value: String) {
+        backingField = value
+    }
+}
+
+class Foo {
+    private val delegate = Delegate()
+    var p: String
+        // 접근자
+        get() = delegate.getValue(this, ::p)
+        set(value) = delegate.setValue(this, ::p, value)
+}
+
+fun main(args: Array<String>) {
+    val foo = Foo()
+    println(foo.p)
+    // set
+    foo.p = "new value"
+    println(foo.p)
+}
+```
+
+- `thisRef` : 위임 프로퍼티를 소유한 객체를 나타내며(여기서는 Foo), null 포함 가능 타입으로 정의되어 다양한 컨텍스트에서 사용
+- `property` : 위임 프로퍼티에 대한 메타데이터 제공하며, 여기서 사용된 `KProperty`는 리플렉션 기능을 지원
+
+간소화하여 사용하면 아래와 같이 사용 가능하다.
+```kotlin
+class Foo {
+    // 위임 프로퍼티의 접근자를 사용 가능
+    var p: String by Delegate()
+}
+```
+
+#### 7.5.2 위임 프로퍼티 사용 : by lazy()를 사용한 프로퍼티 초기화 지연
+
+- 지연 초기화는 객체의 일부분이 실제로 필요할 때 초기화하는 패턴이다.
+- 초기화 과정에 자원을 많이 사용하거나 반드시 초기화하지 않아도 되는 프로퍼티에 대해 적용 가능하다.
+
+```kotlin
+class Email{}
+
+fun loadEmails(person: Ch7Person): List<Email> {
+    println("Load email for ${person.name}")
+    return listOf()
+}
+
+class Ch7Person (val name: String) {
+    // 이메일 리스트 : 초기값 null
+    private var _emails: List<Email>? = null
+    val emails: List<Email>
+        get() {
+            // 이메일 리스트가 null이면 로드
+            if (_emails == null) {
+                _emails = loadEmails(this)
+            }
+            // 이메일 리스트 반환
+            return _emails!!
+        }
+}
+
+fun main(args: Array<String>) {
+    val p = Ch7Person("Alice")
+    // _emails == null 이기 때문에 로드
+    p.emails
+    // 데이터가 있으므로 반환
+    p.emails
+}
+```
+
+- 백킹 프로퍼티(_emails) 기법을 사용
+- 널이 될 수 있는 타입과 널이 될 수 없는 타입으로 총 두개의 프로퍼티 사용
+- `by lazy {}`를 사용해 간소화 가능
+
+
+**lazy 함수**
+```kotlin
+class Ch7Person (val name: String) {
+    val emails by lazy {loadEmails(this)}
+}
+```
+
+- getValue() 메서드가 들어있는 객체를 반환
+- lazy와 by를 함께 사용해 위임 프로퍼티 생성
+- 기본적으로 스레드 안전하게 동작
+- 다중 스레드 환경에서 사용하지 않을 프로퍼티를 위해 막을 수 있음
 
