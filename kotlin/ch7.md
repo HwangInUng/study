@@ -702,3 +702,146 @@ class Ch7Person (val name: String) {
 - 기본적으로 스레드 안전하게 동작
 - 다중 스레드 환경에서 사용하지 않을 프로퍼티를 위해 막을 수 있음
 
+#### 7.5.3 위임 프로퍼티 구현
+어떤 객체의 프로퍼티가 바뀔 때마다 리스너에게 변경 통지를 보내고 싶은 경우 등에 대한 기능을 구현하고 위임 프로퍼티를 사용해 리팩토링을 해보자.
+
+- PropertyChangeSupport 인스턴스를 저장 할 changeSupport 필드를 보유하는 도우미 클래스를 생성
+
+```kotlin
+open class PropertyChangeAware {
+    // PropertyChangeSuppeort 인스턴스 생성
+    protected val changeSupport = PropertyChangeSupport(this)
+
+    fun addPropertyChangeListener(listener: PropertyChangeListener) {
+        changeSupport.addPropertyChangeListener(listener) {
+            changeSupport.addPropertyChangeListener(listener)
+        }
+    }
+
+    fun removePropertyChangeListener(listener: PropertyChangeListener) {
+        changeSupport.removePropertyChangeListener(listener)
+    }
+}
+
+class PersonByPropertyTest(val name: String, age: Int, salary: Int) : PropertyChangeAware() {
+    var age: Int = age
+        set(newValue) {
+            // field는 프로퍼티의 백킹 필드를 참조
+            val oldValue = field
+            field = newValue
+            // 변경사항을 리스너에게 통지
+            changeSupport.firePropertyChange("age", oldValue, newValue)
+        }
+
+    var salary: Int = salary
+        set(newValue) {
+            val oldValue = field
+            field = newValue
+            changeSupport.firePropertyChange("salary", oldValue, newValue)
+        }
+}
+
+fun main(args: Array<String>) {
+    val p = PersonByPropertyTest("Dmitry", 33, 2000)
+    p.addPropertyChangeListener(
+            // 변경 리스너를 인자로 전달
+            PropertyChangeListener { event ->
+                println("Property ${event.propertyName} changed " +
+                        "from ${event.oldValue} to ${event.newValue}")
+            }
+    )
+
+    p.age = 40
+    p.salary = 3000
+}
+```
+위 코드의 경우 세터 코드에서의 중복이 발생한다. 이 부분에 대하여 리팩토링을 수행해보자.
+
+```kotlin
+class ObservableProperty(
+        var propName: String, var propValue: Int,
+        val changeSupport: PropertyChangeSupport
+) {
+    fun getValue(): Int = propValue
+    // 세터를 호출하여 사용할 수 있도록 중복 로직을 정의
+    fun setValue(newValue: Int) {
+        val oldValue = propValue
+        propValue = newValue
+        changeSupport.firePropertyChange(propName, oldValue, newValue)
+    }
+}
+
+class PersonByPropertyTest(val name: String, age: Int, salary: Int) : PropertyChangeAware() {
+    var _age = ObservableProperty("age", age, changeSupport)
+    var age: Int
+        get() = _age.getValue()
+        set(value) {
+            _age.setValue(value)
+        }
+
+    val _salary = ObservableProperty("salary", salary, changeSupport)
+    var salary: Int
+        get() = _salary.getValue()
+        set(value) {
+            _salary.setValue(value)
+        }
+}
+```
+
+- `addPropertyChangeListener()`를 별도로 호출할 필요가 없어짐
+- `changeSupport.firePropertyChange()`를 각 프로퍼티의 세터에서 호출할 필요가 없어짐
+- 다만, `ObservableProperty`의 게터와 세터는 `Int` 타입만 다룰 수 있는 상태로 제네릭을 추가하여 타입을 유연하게 확장하도록 처리 필요
+
+```kotlin
+// 제네릭으로 호출 시 타입을 지정하면 T로 해당 타입 파라미터가 전달
+class ObservableProperty<T> (...){
+    fun getValue():T = propValue
+    fun setValue(newValue: T) {
+        ...
+    }
+]
+```
+
+위의 두 가지의 코드에서 최종적으로 프로퍼티 위임을 사용하여 관례에 맞게 수정한 결과를 보자.
+
+```kotlin
+class ObservableProperty(
+        var propValue: Int, val changeSupport: PropertyChangeSupport
+) {
+    operator fun getValue(p: PersonByPropertyTest, prop: KProperty<*>): Int = propValue
+    operator fun setValue(p: PersonByPropertyTest, prop: KProperty<*>, newValue: Int) {
+        val oldValue = propValue
+        propValue = newValue
+        changeSupport.firePropertyChange(prop.name, oldValue, newValue)
+    }
+}
+
+class PersonByPropertyTest(val name: String, age: Int, salary: Int) : PropertyChangeAware() {
+    // 생성자 매개변수로 전달된 age, salary의 정보를 내부적으로 획득
+    var age: Int by ObservableProperty(age, changeSupport)
+    var salary: Int by ObservableProperty(salary, changeSupport)
+}
+```
+
+- `operator` 변경자를 붙여서 정의
+- 프로퍼티를 표헌하는 객체 `PersonByPropertyTest`와 프로퍼티를 표현하는 객체 `KProperty`를 파라피터로 전달
+- 리플렉션을 통해 `.name`을 이용하여 프로퍼티 이름 획득
+- `.name`을 통해 프로퍼티 이름 획득이 가능하므로 주 생성자에서 name을 제거
+
+코틀린은 위임 객체를 감춰진 프로퍼티에 저장하고, 주 객체의 프로퍼티를 읽거나 쓸 때마다 위임 객체의 `getValue`와 `setValue`를 호출해준다.
+
+마지막으로 by의 오른쪽에 있는 식이 반드시 새 인스턴스일 필요는 없다.
+
+- 함수 호출
+- 다른 프로퍼티
+- 다른 식 등
+
+다만, 우항의 식을 계산한 결과가 컴파일러가 호출할 수 있는 올바른 타입을 제공해야만한다.
+
+#### 7.5.4 위임 프로퍼티 컴파일 규칙
+```kotlin
+var prop: Type by MyDelegate()
+```
+
+- 위임 객체의 인스턴스는 감춰진 프로퍼티에 저장하고, `delegate`라고 부름
+- 프로퍼티 표현을 위해 `KProperty` 타입의 객체를 사용하고, `property`라고 부름
