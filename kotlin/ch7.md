@@ -845,3 +845,81 @@ var prop: Type by MyDelegate()
 
 - 위임 객체의 인스턴스는 감춰진 프로퍼티에 저장하고, `delegate`라고 부름
 - 프로퍼티 표현을 위해 `KProperty` 타입의 객체를 사용하고, `property`라고 부름
+- 컴파일러는 모든 프로퍼티 접근자 안에 `getValue`, `setValue` 호출 코드 생성
+- 프로퍼티 사용 시 `delegate`의 `getValue`,`setValue` 함수 호출
+
+```kotlin
+class C {
+    private val <delegate> = MyDelegate()
+    var prop: Type
+        // property : KProperty 객체
+        get() = <delegate>.getValue(this, <property>)
+        set(newValue:Type) = <delegate>.setValue(this, <property>, value)
+}
+```
+
+이런 메커니즘의 활용법은 다음과 같다.
+
+- 프로퍼티 값이 저장될 장소를 변경
+- 프로퍼티를 읽거나 쓸 떄 벌어지는 일을 변경 등
+
+#### 7.5.5 프로퍼티 값을 맵에 저장
+자신의 프로퍼티를 동적으로 정의할 수 있는 객체인 확장 가능한 객체를 만들 때 위임 프로퍼티 사용법에 대해 알아보자.
+정보를 모두 맵에 저장하고, 그 맵을 통해 처리하는 프로퍼티를 통해 필수 정보를 제공하는 방법이다.
+
+**위임 프로퍼티 미사용**
+```kotlin
+class PersonByPropertyTest {
+    // 추가 정보
+    private val _attributes = hashMapOf<String, String>()
+    fun setAttribute(attrName: String, value: String) {
+        _attributes[attrName] = value
+    }
+
+    // 필수 정보
+    val name: String
+        // 수동으로 맵의 정보를 꺼냄
+        // 예제에서는 널 단언을 사용했지만 실제로는 안전한 캐스팅을 사용
+        get() = _attributes["name"] ?: ""
+}
+
+fun main(args: Array<String>) {
+    val p = PersonByPropertyTest()
+    val data = mapOf("name" to "Dmitry", "company" to "JetBrains")
+    for ((attrName, value) in data) {
+        p.setAttribute(attrName, value)
+    }
+
+    println(p.name)
+}
+```
+
+**위임 프로퍼티 사용**
+```kotlin
+class PersonByPropertyTest {
+    // 추가 정보
+    private val _attributes = hashMapOf<String, String>()
+    fun setAttribute(attrName: String, value: String) {
+        _attributes[attrName] = value
+    }
+
+    // 위임 프로퍼티로 맵을 사용
+    // Map, MutableMap 인터페이스에 대해 getValue, setValue 확장 함수를 제공
+    val name: String by _attributes
+```
+
+`getValue`에서 맵에 프로퍼티 값을 저장할 때 자동으로 프로퍼티 이름을 키로 활용한다.
+
+#### 7.5.6 프레임워크에서 위임 프로퍼티 활용 : 교재 참고
+
+---
+
+### 요약
+- 표준 수학 연산자를 정해진 이름의 함수로 오버로딩 가능
+- 비교 연산자는 `equals`와 `compareTo`로 변환
+- 클래스에 `get`,`set`,`contains` 함수를 정의하면 []와 in 연산 사용 가능
+- 범위를 지정하거나 컬렉션과 배열의 원소 이터레이션을 하고 싶다면 `rangeTo`와 `iterator` 함수를 정의
+- 한 객체의 상태를 분해하여 여러 변수에 대입하기 위해 구조 분해 선언 사용
+  - 데이터 클래스의 경우 `componentN` 함수가 정의되어 있으며 최대 5까지 사용
+  - 커스텀 클래스는 `componentN`을 직접 정의
+- 위임 프로퍼티를 통해 값을 저장, 초기화 할 때 사용하여 로직 재활용 가능
