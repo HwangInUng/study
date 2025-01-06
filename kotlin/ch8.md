@@ -41,7 +41,7 @@ val action: () -> Unit = {println(42)}
 - 함수를 수행한 반환 타입을 지정
 - 함수 타입을 선언할 때는 반환 타입을 반드시 명시
 
-대부분의 언어에서 사용되는 람다 함수의 `화살표(->)`는 **'화살표 좌항의 파라미터를 우항의 실행부로 전달한다'**라는 의미로 받아들이면 된다.
+대부분의 언어에서 사용되는 람다 함수의 `화살표(->)`는 **화살표 좌항의 파라미터를 우항의 실행부로 전달한다**라는 의미로 받아들이면 된다.
 또한 우항에 단일 표현식이 있는 경우 결과를 암시적으로 반환한다.
 
 ```kotlin
@@ -333,3 +333,112 @@ fun <T> Collection<T>.joinToString(
 엘비스 연산자를 이용하여 함수 타입이 null이 아닌 경우 실행하고, null인 경우 `toString`을 기본으로 실행하도록 지정한다.
 
 #### 8.1.5 함수를 함수에서 반환
+상황에 따라 수행해야하는 로직이 달라지는 경우 어떤 로직을 선택하여 함수로 반환하는 방법이 사용될 수 있다.
+
+```kotlin
+enum class Delivery { STANDARD, EXPEDITED }
+
+class Order(val itemCount: Int)
+
+fun getShippingCostCalculator(
+        delivery: Delivery): (Order) -> Double {
+    // 조건에 따라 람다를 반환
+    if (delivery == Delivery.EXPEDITED) {
+        return { order -> 6 + 2.1 * order.itemCount }
+    }
+    return { order -> 1.2 * order.itemCount }
+}
+
+fun main(args: Array<String>) {
+    val calculator = getShippingCostCalculator(Delivery.EXPEDITED)
+    val order = Order(3)
+    println(calculator(order))
+}
+```
+
+- 반환 타입으로 함수 타입을 지정
+- return 식에 람다, 멤버 참조, 함수 타입의 값을 계산하는 식 등을 작성
+
+#### 8.1.6 람다를 활용한 중복 제거
+반복되거나 재사용되는 코드의 중복을 제거해보자.
+
+```kotlin
+data class SiteVisit(
+        val path: String,
+        val duration: Double,
+        val os: OS
+)
+
+enum class OS { WINDOWS, LINUX, MAC, IOS, ANDROID }
+
+fun main(args: Array<String>) {
+    val log = listOf(
+            SiteVisit("/", 34.0, OS.WINDOWS),
+            SiteVisit("/", 22.0, OS.MAC),
+            SiteVisit("/loign", 12.0, OS.LINUX),
+            SiteVisit("/signup", 8.3, OS.IOS),
+            SiteVisit("/", 16.3, OS.ANDROID),
+    )
+    // filter의 술어로 OS.WINDOWS 사용
+    val averageWindowsDuration = log.filter { it.os == OS.WINDOWS }
+            .map(SiteVisit::duration)
+            .average()
+
+    println(averageWindowsDuration)
+}
+```
+중복을 제거하기 위해서 `OS.WINDOWS` 부분을 파라미터로 전달해보자.
+
+```kotlin
+// OS를 파라미터로 전달
+fun List<SiteVisit>.averageDuration(os: OS) = filter { it.os == os }.map(SiteVisit::duration).average()
+
+fun main(args: Array<String>) {
+    val log = listOf(...)
+    println(log.averageDuration(OS.WINDOWS))
+}
+```
+
+- 플랫폼 비교 표현만으로는 모바일 디바이스 사용자의 평균 방문 시간 등을 구하긴 제한
+- 복잡한 질의에 따른 분석이 제한
+
+위 문제를 해결할 수 있는 고차 함수를 정의해보자.
+
+```kotlin
+// 고차 함수 선언
+// 파라미터로 함수 타입을 전달
+fun List<SiteVisit>.averageDurationFor(predicate: (SiteVisit) -> Boolean) = filter(predicate).map(SiteVisit::duration).average()
+
+fun main(args: Array<String>) {
+    val log = listOf(
+            SiteVisit("/", 34.0, OS.WINDOWS),
+            SiteVisit("/", 22.0, OS.MAC),
+            SiteVisit("/loign", 12.0, OS.LINUX),
+            SiteVisit("/signup", 8.3, OS.IOS),
+            SiteVisit("/", 16.3, OS.ANDROID),
+    )
+    // 모바일 디바이스 조회
+    println(log.averageDurationFor { it.os in setOf(OS.ANDROID, OS.IOS) })
+    // 특정 플랫폼의 경로 조회
+    println(log.averageDurationFor { it.os == OS.IOS && it.path == "/signup" })
+}
+```
+
+- 코드의 일부분을 람다로 정의하여 파라미터로 전달
+- 함수 타입은 전략 패턴으로 동작할 수 있기 때문에 람다식이 없다면 인터페이스를 전달하고, 있다면 함수 타입을 사용
+
+**고차 함수와 전략 패턴**
+|구분|고차 함수|전략 패턴|
+|---|---|---|
+|정의|다른 함수를 인자로 받거나 반환할 수 있는 함수|객체 지향 디자인 패턴 중 하나로 특정 동작을 동적으로 변경할 수 있도록 하는 패턴|
+|접근방식|함수형 프로그래밍|객체 지향 프로그래밍|
+|동작 전달 방식|함수를 인자로 전달|객체를 인자로 전달|
+|코드 간결성|매우 간결|인터페이스 및 클래스 정의 필요|
+|상태 유지|불가능(무상태 함수)|가능(전략 객체에서 상태 보유)|
+
+고차 함수와 전력 패턴은 **행동의 동적 변경**이라는 동일한 목적을 위해 사용되며, 모듈화를 통한 코드의 중복을 줄인다.
+하지만 위의 표에 정리된 것처럼 특징이 존재하기 때문에 용도에 따라 사용할 수 있다.
+
+- 고차 함수 : 전략이 간단하고, 간결하게 동작을 표현하거나 인터페이스 및 구현체 관리가 불필요한 경우에 사용
+- 전략 패턴 : 상태를 유지해야하거나, 명시적인 인터페이스로 여러 구현체를 관리해야하는 경우
+
