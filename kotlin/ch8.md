@@ -543,7 +543,7 @@ inline fun foo(inlined: () -> Unit, noinline notInlined: () -> Unit) {...}
 
 |구분|Sequence|컬렉션|
 |---|---|---|
-|동작 방식|지연 실행 방식(lazy evaluation)|즉시 실행 방식(eager evaluation)|
+|동작 방식|지연 실행 방식(lazy evaluation)|즉시 실행 방식(eager evaluation)|
 |인라인 여부|X|O|
 |특징|실행 계획이 저장되어 최종 연산 시 동작|함수 호출 오버헤드를 감소|
 |클로저 객체 생성|O|X|
@@ -556,4 +556,111 @@ inline fun foo(inlined: () -> Unit, noinline notInlined: () -> Unit) {...}
 위와 같이 이유 떄문에 모든 컬렉션을 시퀀스로 변환하는 `asSequece`를 호출해서는 안된다.
 컬렉션의 크기가 큰 경우에만 성능적인 이점을 달성 할 수 있다.
 
+#### 8.2.4 함수를 인라인으로 선언해야 하는 경우
+inline 키워드를 사용한다고 무조건 함수 성능을 높일 수 없는데 그 이유는 다음과 같다.
 
+- 일반 함수는 JVM의 JIT 과정에서 코드 실행을 분석하여 인라이닝을 지원한다.
+- JVM 최적화를 활용하면 각 함수 구현이 정확히 한 번만 있으면 된다.
+- 반면, 코틀린 인라인 함수는 바이트 코드에서 각 함수 호출 지점을 함수 본문으로 대치한다.
+- 이런 이유로 코드 중복이 발생한다.
+
+그렇다면 람다를 인자로 받는 함수의 인라이닝을 어떨까?
+
+- 함수 호출 비용, 람다 표현 클래스 및 인스턴스에 해당하는 객체를 만들지 않아도된다.
+- 일반 람다에서 사용할 수 없는 넌로컬 반환 등의 기능을 사용할 수 있다.
+
+#### 8.2.5 자원 관리를 위해 인라인된 람다 사용
+
+```kotlin
+fun <T>Lock.withLock(action: () -> T): T {
+    lock()
+    try {
+        return action()
+    } finally {
+        unlock()
+    }
+}
+```
+위 코드는 락을 획득한 후 작업하는 과정을 `action`이라는 별도 함수로 분리한다.
+
+**use**
+- 닫을 수 있는 자원에 대한 확장 함수
+- 람다를 인자로 받으며 람다를 호출한 다음 자원을 닫아줌
+- 예외가 발생하더라도 자원을 확실히 닫음
+
+```kotlin
+fun readFirstLineFromFile(path: String): String {
+    BufferedReader(FIleReader(path)).use {br ->
+        return br.readLine()
+    }
+}
+```
+
+- `BufferedReader` 객체를 만들고 `use` 함수를 호출하여 연산을 수행할 람다를 넘긴다.
+- 람다에서 결과를 반환하는 것이 아닌 외부 함수에서 결과를 반환한다.
+
+---
+
+### 8.3 고차 함수 안에서 흐름 제어
+루프와 같은 명령형 코드를 인자로 전달되는 람다 안에서 사용할 떄 벌어지는 일들을 알아보자.
+
+#### 8.3.1 람다 안의 return문 : 람다를 둘러싼 함수로부터 반환
+
+**for 루프**
+```kotlin
+data class Ch8Person (val name: String, val age: Int)
+
+fun lookForAlice (people: List<Ch8Person>) {
+    for(person in people) {
+        if(person.name == "Alice") {
+            println("Ok")
+            return
+        }
+    }
+    println("No")
+}
+
+fun main(args: Array<String>) {
+    val people = listOf(Ch8Person("Alice", 29), Ch8Person("Bob", 33))
+    println(lookForAlice(people))
+}
+```
+
+위 코드를 다양한 컬렉션 함수를 통해 실행시켜보면서 return 사용에 대하여 알아보자.
+
+**forEach**
+```kotlin
+fun lookForAlice(people: List<Ch8Person>) {
+    people.forEach {
+        if (it.name == "Alice") {
+            println("Ok")
+            return
+        }
+    }
+    println("No")
+}
+```
+
+`forEach`를 사용하더라도 return에는 문제가 없는 모습을 볼 수 있다.
+람다에서 return은 람다를 호출하는 함수가 실행을 끝내고 반환되며 이런 return 형태를 `non-local return`이라 부른다.
+
+- 자바에서는 for, synchronized 함수 등이 함수 블록을 중단하고 반환한다.
+- 코틀린에서도 람다를 함수로 받을 경우 자바의 return과 동일하게 동작한다.
+- 이런 경우는 인라인 함수인 경우에만 해당한다.
+
+#### 8.3.2 람다로부터 반환: 레이블을 사용한 return
+
+- 람다 식에서 레이블을 이용하여 로컬 return 사용 가능
+- `break`와 유사한 역할을 수행
+- 이 경우 람다의 실행을 끝내고, 람다를 호출한 코드의 실행을 이어감
+
+```kotlin
+fun lookForAlice(people: List<Ch8Person>) {
+    people.forEach lable@{
+        if (it.name == "Alice") return@lable
+        // if (it.name == "Alice") return@forEach 식으로 함수 이름으로 레이블 가능
+    }
+    println("No")
+}
+```
+이 경우 항상 "No"가 출력된다.
