@@ -232,3 +232,262 @@ class Processor<T> { // Any?와 동일
 - `?`가 붙은 타입을 지정하면 컴파일 에러가 발생
 
 ---
+
+### 9.2 실행 시 제네릭스의 동작: 소거된 타입 파라미터와 실체화된 타입 파라미터
+- JVM의 제네릭스는 보통 타입 소거를 사용해 구현
+- 실행 시점에 제네릭 클래스 인스턴스에 타입 인자 정보가 들어있지 않다는 의미
+- 코틀린에서는 `inline` 함수를 통해 이런 제약을 우회 가능
+
+#### 9.2.1 실행 시점의 제네릭: 타입 검사와  캐스트
+- 제네릭 타입 인자 정보는 런타임에 지워짐
+- 제네릭 클래스 인스턴스의 타입 인자에 대한 정보를 유지하지 않음을 의미
+
+```kotlin
+val list1: List<String> = listOf("a", "b")
+val list2: List<Int> = listOf(1, 2, 3)
+```
+
+- 컴파일러는 두 리스트를 서로 다른 리스트로 인식
+- 실행 시점에는 완전히 같은 타입 객체로 인식
+- 컴파일러가 타입을 보장하기 때문에 실행 시점에서 해당 타입의 데이터만 보유하는 것이 가능
+
+```kotlin
+if (value is List<String>) {...}
+
+>> ERROR: Cannot check for instance of erased type
+```
+- 타입 소거는 실행 시점에 타입 인자 검사가 불가능하다는 한계가 있다.
+- 다만, 타입 정보의 크기가 줄어들어 메모리 사용량 감소라는 장점도 보유하고 있다.
+- 자바의 `<?>`와 같은 스타 프로젝션(`*`)을 사용하여 타입 검사를 할 수 있다.
+
+```kotlin
+// 스타 프로젝션 사용
+if (value is List<*>) {...}
+
+// 파라미터가 2개 이상
+if (value is Map<*, *>) {...}
+```
+
+- `as` 또는 `as?`를 사용한 캐스팅에도 제네릭 타입 사용이 가능하다.
+- 기저 클래스가 같고, 타입 인자가 다르더라도 캐스팅에 성공한다는 점을 주의해야한다.
+- 컴파일러가 `Unchecked cast: Collection<*> to List<Int>`와 같은 경고를 출력한다.
+
+```kotlin
+fun printSum(c: Collection<*>) {
+    // 기저 클래스 : Collection
+    // 타입 인자는 정의하기 나름
+    val intList = c as? List<Int> ?: throw IllegalArgumentException("List is expected")
+
+    println(intList.sum())
+}
+
+fun main(args: Array<String>) {
+    printSum(listOf(1, 2, 3)) // 타입 추론을 통한 정상 동작
+}
+
+>>> 6
+```
+
+- 잘못된 타입의 원소가 들어있는 리스트를 전달하면 `ClassCastException`이 발생한다.
+- 해당 예외가 발생하는 시점은 `intList.sum()`을 실행하는 시점이다.
+- 컴파일러가 안전하지 못한 검사와 수행할 수 있는 검사를 알려주기 때문에 힌트를 잘 참고해야한다.
+
+#### 9.2.2 실체화한 타입 파라미터를 사용한 함수 선언
+제네릭 함수 에서도 타입 인자 정보를 실행 시점에 알아낼 수는 없다.
+
+```kotlin
+fun <T> isSome(value: Any) = value is T
+```
+
+- `Error: Cannot check for instance of erased type: T` 예외 발생
+- 인라인 함수의 타입 파라미터는 실체화되기 때문에 실행 시점에서 확인 가능
+- 컴파일러가 식을 함수 본문으로 바꾸기 때문
+
+```kotlin
+inline fun <reified T> isA(value: Any) = value is T
+
+fun main(args: Array<String>) {
+    println(isA<String>("abc"))
+    println(isA<String>(12))
+}
+
+>> true
+>> false
+```
+
+- `reified` 키워드를 사용하여 타입 파라미터 지정
+- 함수 호출 시점에 제네릭 타입을 구체적인 타입으로 치환
+
+```kotlin
+inline fun <reified T> isA(value: Any): Boolean {
+    return value is T
+}
+
+// 호출 시점에서 구체화
+println(isA<String>("Hello"))
+// 컴파일 후:
+println("Hello" is String)
+```
+
+- `filterIsInstance<T>()`를 사용하면 실체화한 타입 파라미터를 활용하여 해당 타입의 원소만 반환
+- 자바에서는 `reified` 타입 파라미터를 사용하는 inline 함수 호출이 불가능
+
+#### 9.2.3 실체화한 타입 파라미터로 클래스 참조 대신
+실체화한 타입 파라미터를 사용해 API 쉽게 호출하는 방법을 알아보자.
+
+```kotlin
+// 일반 호출
+val serviceImpl = ServiceLoader.load(Service::class.java)
+// 실체화한 타입 파라미터 사용
+val serviceImpl = loadErvice<Service>()
+
+// 함수 정의
+inline fun <reified T> loadService() {
+    // 타입 파라미터의 클래스 호출
+    return ServiceLoader.load(T::class.java)
+}
+```
+
+#### 9.2.4 실체화한 타입 파라미터의 제약
+실체화한 타입 파라미터 사용이 가능한 경우는 다음과 같다.
+
+- 타입 검사와 캐스팅 : `is`, `!is`, `as`, `as?`
+- 코틀린 리플렉션 API : `::class`
+- 코틀린 타입에 대응하는 `java.lang.Class` 얻기 : `::class`
+- 다른 함수를 호출할 때 타입 인자로 사용
+
+제약 사항은 다음과 같다.
+- 인스턴스 생성
+- 동반 객체 메서드 호출
+- 실체화한 타입 파라미터를 요구하는 함수에 실체화하지 않은 타입 파라미터를 넘기기
+- 클래스, 프로퍼티, 인라인 함수가 아닌 함수의 타입 파라미터를 `reified`로 지정
+
+기본적으로 실체화한 타입 파라미터는 인라인 함수에서만 사용이 가능하기 때문에 해당 함수에 전달되는 모든 람다와 함께 인라이닝이 된다.
+이런 경우 `noinline` 변경자를 이용해 함수 타입 파라미터의 인라이닝을 금지할 수 있다.
+
+---
+
+### 9.3 변셩: 제네릭과 하위 타입
+변성은 기저 타입은 같지만 타입 인자가 다른 여러 타입의 관계가 어떤지 설명하는 개념이다.
+
+#### 9.3.1 변성이 있는 이유: 인자를 함수에 넘기기
+읽기 전용과 변경 가능한 컬렉션에서 변성이 필요한 이유를 알아보자.
+
+**읽기 전용**
+```kotlin
+fun printContents(list: List<Any>) {
+    println(list.joinToString())
+}
+
+fun main(args: Array<String>) {
+    printContents(listOf("abc", "bac"))
+}
+
+>> abc, bac
+```
+Any 타입의 하위 타입이 String이므로 완전히 안전하기 때문에 정상적으로 동작한다.
+하지만 변경이 가능한 경우에는 어떤 문제가 발생할까?
+
+**변경 가능**
+```kotlin
+fun addAnswer(list: MutableList<Any>) {
+    list.add(42)
+}
+
+fun main(args: Array<String>) {
+    val strings = mutableListOf("abc", "bac")
+    addAnswer(strings) // 컴파일 에러
+}
+```
+Any 타입의 하위 타입 중 무작위로 추가가 된다면 안정성을 보장할 수 없기 때문에 컴파일 에러가 발생한다.
+
+#### 9.3.2 클래스, 타입, 하위 타입
+
+- 클래스 : 타입을 정의하기 위한 틀이지만 클래스가 곧 타입이라고 할 수 없으며, 널을 포함하는 타입까지 고려하면 최소 2개 이상의 타입 구성 가능
+- 타입 : 인터페이스, 클래스, 제네릭, 함수 등으로 정의될 수 있음
+- 하위 타입 : 어떤 타입 A의 값이 필요한 모든 장소에 어떤 타입 B의 값을 넣어도 문제가 없으면 B는 A의 하위 타입으로 간주
+
+```kotlin
+fun test(i: Int) {
+    val n: Number = i // Int는 Number의 하위 타입으로 컴파일 성공
+    fun f (s: String) {...}
+    f(i) // 컴파일 에러
+}
+```
+
+- 컴파일러는 변수 대입, 인자 전달 시 하위 타입 검사를 매번 수행
+- 변수 타입의 하위 타입인 경우에만 값을 변수에 대입하게 허용
+- 간단한 경우 하위 타입은 하위 클래스와 근본적으로 같음
+- 널이 될 수 있는 타입은 널이 될 수 없는 동일 클래스의 상위 타입
+
+인스턴스 타입 사이의 하위 타입 관계가 성립하지 않으면 그 제네릭 타입을 무공변(invariant)라고 말하고,
+반대로 하위 타입 관계가 성립하면 공변적(covariant)라고 말한다.
+자바에서는 모든 클래스가 무공변이다.
+
+#### 9.3.3 공변성: 하위 타입 관계를 유지
+`SomeClass<A>`가 `SomeClass<B>`의 하위 타입이면 `SomeClass`는 공변적이다.
+
+- 제네릭 클래스가 타입 파라미터에 대해 공변적일 경우 `<out T>`로 표시
+- 타입 파라미터를 공변적으로 만들면 타입이 정확히 일치하지 않아도 함수 인자나 반환 값으로 사용 가능
+
+```kotlin
+// 공변적
+class Herd<out T: Animal> {
+    ...
+}
+
+fun feedAll (animals: Herd<Animal>) {
+    for (i in 0 until animals.size) {
+        animals[i].feed()
+    }
+}
+
+fun takeCareOfCats (cats: Herd<Cat>) {
+    for (i in 0 until cats.size) {
+        cats[i].cleanLitter()
+    }
+    feedAll(cats) // 캐스팅 불필요
+}
+```
+
+- 모든 클래스를 공변적으로 만들 수 없음
+- 공변적으로 선언 시 파라미터 사용 방법을 제한
+- 공변적 파라미터는 항상 아웃 위치에만 있어야 함
+- 클래스가 T 타입의 값을 생산할 수 있지만 소비는 불가능
+
+```kotlin
+interface Transformer<T> {
+    // 괄호 안의 T : in
+    // 괄호 밖의 T : out
+    fun transform(t: T): T
+}
+```
+
+- in
+  - 입력 위치에서만 사용
+  - 쓰기 전용으로 값을 소비하는 역할 수행
+  - 반환 타입으로 사용 불가
+- out
+  - 출력 위치에서만 사용
+  - 읽기 전용으로 값을 제공하는 역할 수행
+  - 타입 매개변수를 메서드의 입력으로 사용 불가
+
+공변성은 상위 타입 관계를 유지해야 할 때 유용하게 사용되며, 하위 타입을 수용할 수 있도록 하기 위하여 사용한다.
+
+```kotlin
+// out (공변성)
+interface List<out T>: Collection<T> {
+    fun subList(fromIndex: Int, toIndex: Int): List<T>
+}
+
+// in (반공변성)
+interface MutableList<T>: List<T>, MutableCollection<T> {
+    override fun add(element: T) Boolean
+}
+```
+
+in & out의 영향을 받지 않는 예외는 다음과 같다.
+- 생성자는 인스턴스 생성 시 한 번만 호출되는 함수로 in & out의 영향을 받지 않는다.
+- `private` 메서드는 클래스 내부 구현이기 때문에 영향을 받지 않는다.
+
+#### 9.3.4 반공변성: 뒤집힌 하위 타입 관계
