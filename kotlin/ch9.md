@@ -491,3 +491,65 @@ in & out의 영향을 받지 않는 예외는 다음과 같다.
 - `private` 메서드는 클래스 내부 구현이기 때문에 영향을 받지 않는다.
 
 #### 9.3.4 반공변성: 뒤집힌 하위 타입 관계
+반공변 클래스의 하위 타입 관계는 공변 클래스의 경우와 반대이다.
+
+```kotlin
+interface Comparator<in T> {
+    // T를 in 위치에 사용
+    fun compare(e1: T, e2: T): Int {...}
+}
+```
+- T 타입의 값을 소비
+- in 위치에만 쓰여야함
+
+```kotlin
+fun main(args: Array<String>) {
+    val anyComparator = Comparator<Any> {
+        e1, e2 -> e1.hashCode() - e2.hashCode()
+    }
+
+    val strings: List<String> = listOf("a", "b")
+    strings.sortedWith(anyComparator)
+}
+```
+
+- Comparator<Any>가 Comparator<String> 보다 더 일반적인 타입을 비교 가능
+- Comparator<Any>는 Comparator<String>에 전달되었을 때 String의 조상까지 비교가능
+- 즉 반공변에서는 이런 상황에서 Comparator<Any>를 Comparator<Stirng>의 하위 타입이라 부름
+
+```kotlin
+Cat -> Animal
+
+// 공변성
+Producer<Cat> -> Producer<Animal>
+// 반공변성
+Consumer<Animal> -> Cumsumer<Cat>
+```
+
+in은 해당 클래스의 메서드 안으로 전달돼 메서드에 의해 소비된다는 의미이다.
+
+특정 파타입 파라미터에 대해서는 공변적이면서 다른 타입 파라미터에서는 반공변적일 수도 있는 예시를 알아보자.
+```kotlin
+interface Finction1<in P, out R> {
+    operator fun invoke(p:P):R
+}
+```
+
+- Function1의 하위 타입 관계는 첫 번째 타입 인자의 하위 타입 관계와 정반대
+- 두 번째 타입 인자의 하위 타입 관계와는 같음을 의미
+
+```kotlin
+fun enumerateCats(f: (Cat) -> Number) {...}
+fun Animal.getIndex(): Int = ...
+
+// Animal은 Cat의 상위 타입
+// Int는 Number의 하위 타입
+enumerateCats (Animal::getIndex)
+```
+- 클래스 정의에 변성을 직접 기술하면 그 클래스를 사용하는 모든 장소에 변성이 적용
+- 자바는 이를 지원하지 않음
+
+위 예시는 인자의 타입에 대해서는 반공변적이고, 반환 타입에 대해서는 공변적이다.
+즉, in의 위치에는 정반대의 하위 타입 관계가 성립하고, out 위치에는 일반적인 하위 타입 관계가 성립한다.
+
+
