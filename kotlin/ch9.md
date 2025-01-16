@@ -552,4 +552,184 @@ enumerateCats (Animal::getIndex)
 위 예시는 인자의 타입에 대해서는 반공변적이고, 반환 타입에 대해서는 공변적이다.
 즉, in의 위치에는 정반대의 하위 타입 관계가 성립하고, out 위치에는 일반적인 하위 타입 관계가 성립한다.
 
+#### 9.3.5 사용 지점 변성: 타입이 언급되는 지점에서 변성 지정
 
+- 선언 지점 변성 : 클래스를 선언하면서 변성을 지정
+- 사용 지점 변성 : 타입 파라미터를 사용할 때마다 대치할 상위 혹은 하위 타입을 명시
+
+**선언 지점 변성과 자바 와일드카드 비교**
+- 선언 지점 변성 사용 시 변성 변경자를 단 한번만 작성하여 코드가 간결해짐
+- 자바의 와일드카드는 항상 와일드카드를 정의
+
+```koltin
+// 타입이 일치한 두 컬렉션의 데이터 복사
+fun <T> copyData(source: MutableList<T>, desination: MutableList<T>) {
+    for (item in source) {
+        desination.add(item)
+    }
+}
+
+// 타입이 정확하게 일치하지 않은 두 컬렉션의 데이터 복사
+fun <T : R, R> copyData(source: MutableList<T>, desination: MutableList<R>) {
+    for (item in source) {
+        desination.add(item)
+    }
+}
+```
+- 두 컬렉션 모두 무공변 타입
+- 타입이 정확하게 일치하진 않지만 하위 타입 관계는 성립해야함
+
+```kotlin
+fun main(args: Array<String>) {
+    val ints = mutableListOf(1, 2, 3) // Int로 타입 추론
+    val anyItems = mutableListOf<Any>()
+
+    // Int는 Any의 하위 타입
+    copyData(ints, anyItems)
+    println(anyItems)
+}
+
+>> [1, 2, 3]
+```
+
+위와 같은 경우 변성 변경자를 이용해 간결하게 작성 가능하다.
+```kotlin
+fun <T> copyData(source: MutableList<out T>, desination: MutableList<T>) {
+    for (item in source) {
+        desination.add(item)
+    }
+}
+```
+out 변경자를 이용해 읽기 전용으로만 사용한다고 명시하면 안전성이 보장된다.
+
+**타입 프로젝션**
+- 타입 선언에서 타입 파라미터 사용위치 어디에나 변성 변경자를 붙일 수 있다.
+- 타입 프로젝션에 의해 반환 타입도 T를 out 위치에서 사용하는 메서드만 호출할 수 있다.
+- 컴파일러는 타입 파라미터 T를 in 위치에 있는 타입으로 사용하지 못하게 막는다.
+
+```kotlin
+fun main(args: Array<String>) {
+    // out 변경자로 읽기 전용 메서드만 호출 가능
+    val list: MutableList<out Number> = mutableListOf(1)
+    list.add(42) // in 위치에 사용할 수 없음
+}
+
+fun main(args: Array<String>) {
+    // in 변경자로 쓰기 전용 동작
+    val list: MutableList<in Number> = mutableListOf(1)
+    val value: Int = list.get(0) // Any?로 반환하며 컴파일 에러
+}
+
+fun main(args: Array<String>) {
+    // in을 사용하였지만 println()의 인자 타입은 Any? 이기 때문에 정상 실행 가능
+    val list: MutableList<in Number> = mutableListOf(1)
+    println(list.get(0))
+}
+```
+in을 사용하면 해당 파라미터의 상위 타입으로 대치가 가능하다.
+```kotlin
+fun <T> copyData(source: MutableList<T>, desination: MutableList<in T>) {
+    for (item in source) {
+        desination.add(item)
+    }
+}
+```
+
+#### 9.3.6 스타 프로젝션: 타입 인자 대신 * 사용
+스타 프로젝션은 무공변성이 아닌 구체적인 타입의 원소를 저장하기 위해 만들어진 것이다.
+
+- MutableList<*>는 아무 타입이나 다 담아도 되는 것이 아니다.
+- 스타 프로젝션을 적용한 컬렉션의 원소는 Any?의 하위 타입이다.
+- MutableList<*>는 MutableList<out Any?>처럼 동작한다.
+- 즉, 읽기 전용으로 동작할 순 있지만 아무 타입이나 넣을 순 없다.
+
+```kotlin
+fun printFirst(list: List<*>) {
+    if(list.isNotEmpty()) { // 스타 프로젝션 미사용
+        println(list.first()) // Any? 반환
+    }
+}
+```
+스타 프로젝션은 제네릭 타입 파라미터를 사용하여 우회 가능하다.
+
+**스타 프로젝션을 쓰는 경우**
+- 제네릭 타입 파라미터가 어떤 타입인지 굳이 알 필요가 없는 경우
+- 값을 만들어내는 메서드만 호출할 수 있는 경우
+- 또한, 그 값의 타입에는 신경쓸 필요가 없는 경우
+
+스타 프로젝션의 사용 방법과 함정에 대해 알아보자.
+```kotlin
+// 반공변성
+interface FieldValidator<in T> {
+    fun validate(input: T): Boolean
+}
+
+object DefaultStringValidator: FieldValidator<String> {
+    override fun validate(input: String) = input.isNotEmpty()
+}
+
+object DefaultIntValidator: FieldValidator<Int> {
+    override fun validate(input: Int) = input >= 0
+}
+
+fun main(args: Array<String>) {
+    // 클래스의 정보를 담은 KClass를 키로 사용
+    // 스타 프로젝션 적용
+    val validators = mutableMapOf<KClass<*>, FieldValidator<*>>()
+    validators[String::class] = DefaultStringValidator
+    validators[Int::class] = DefaultIntValidator
+
+    validators[String::class]!!.validate("")
+}
+```
+위 예제에서는 `FieldValidator<*>`에 의해서 String 타입을 검증할 때 안전하지 않기 때문에 검증을 할 수 없다는 컴파일 에러가 발생한다.
+
+- 알 수 없는 타입 검증기에 구체적인 타입을 넣으면 안전하지 않다.
+- 검증기를 원하는 타입으로 캐스팅해야 문제 해결이 가능하다.
+- 다만, 그런 캐스팅 조차 안전하지 못하다.
+
+```kotlin
+// 캐스팅을 수행한 경우
+val stringValidator = validators[Int::class] as FieldValidator<String>
+```
+이 경우 컴파일 에러는 발생하지 않고, as 뒤에 경고만 발생한다.
+하지만 실제로 실행하는 경우 `ClassCastException`이 발생하기 때문에 오히려 컴파일 단계에서 동작을 예상할 수 없다.
+
+**타입을 캡슐화하여 해결**
+```kotlin
+object Validators {
+    private val validators = mutableMapOf<KClass<*>, FieldValidator<*>>()
+
+    // 함수의 타입 파라미터를 이용하여 타입 관계 설정
+    fun <T : Any> registerValidator(kClass: KClass<T>, fieldValidator: FieldValidator<T>) {
+        validators[kClass] = fieldValidator
+    }
+
+    // 접근자를 이용하여 T 타입의 Validator를 반환
+    @Suppress("UNCHECKED_CAST")
+    operator fun <T : Any> get(kClass: KClass<T>): FieldValidator<T> =
+        validators[kClass] as? FieldValidator<T> ?: throw IllegalArgumentException("No validator")
+}
+
+fun main(args: Array<String>) {
+    Validators.registerValidator(String::class, DefaultStringValidator)
+    Validators.registerValidator(Int::class, DefaultIntValidator)
+
+    println(Validators[String::class].validate("kotlin"))
+    println(Validators[Int::class].validate(412))
+}
+```
+- 제네릭 메서드의에서 검증기와 클래스의 타입 인자가 같다.
+- 타입이 일치하지 않는 클래스와 검증기는 컴파일 에러가 발생한다.
+
+---
+
+### 9.4 요약
+- 코틀린 제네릭스 함수와 클래스를 자바와 비슷하게 선언 가능하다.
+- 제네릭 타입의 인자는 컴파일 시점에만 존재한다.
+- `is` 연산자를 사용해 실행 시점에 타입 검사를 진행할 수 없다.
+- `reified`를 이용하여 인라인 함수의 타입 매개변수를 실체화 할 수 있다.
+- 변성은 기저 클래스가 같고 타입 파라미터가 다른 두 제네릭의 관계를 설명한다.
+- 공변적이라는 것은 out 위치에만 사용되며, 읽기 전용이다.
+- 반공변적이라는 것은 in 위치에만 사용되며, 쓰기 전용이다.
+- 함수 인터페이스는 첫 번째 타입 파라미터에 대해서 반공변적이고, 두 번째 타입 파라미터에 대해서는 공변적이다.
